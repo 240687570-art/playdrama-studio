@@ -32,6 +32,21 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  /* Dark mode styles */
+  .dark {
+    --color-background: oklch(15% 0.02 250);
+    --color-foreground: oklch(95% 0.01 250);
+    --color-primary: oklch(60% 0.2 250);
+    --color-primary-foreground: oklch(10% 0 0);
+    --color-muted: oklch(30% 0.04 250);
+    --color-muted-foreground: oklch(70% 0.03 250);
+    --color-border: oklch(30% 0.03 250);
+    --color-card: oklch(20% 0.02 250);
+    --color-card-foreground: oklch(95% 0.01 250);
+    --color-accent: oklch(25% 0.02 250);
+    --color-accent-foreground: oklch(95% 0.01 250);
+  }
+
   * {
     box-sizing: border-box;
   }
