@@ -54,6 +54,8 @@ import {
   Wand2,
 } from 'lucide-react'
 import './App.css'
+import { AiInteractiveStoryGenerator } from './components/AiInteractiveStoryGenerator'
+import { AnalyticsDashboard } from './components/AnalyticsDashboard'
 import {
   acceptInvitation,
   cancelWorkspaceInvitation,
@@ -12964,6 +12966,13 @@ function StudioApp() {
                   回剧情图谱
                 </button>
               </div>
+              <div className="mt-8">
+                <AiInteractiveStoryGenerator
+                  onStoryGenerated={(story) => {
+                    console.log('Generated interactive story:', story)
+                  }}
+                />
+              </div>
             </section>
 
             <section className={pagePanelClass('panel editor-panel compliance-panel', [])}>
@@ -13772,6 +13781,52 @@ function StudioApp() {
                     </article>
                   ))}
                 </div>
+              </div>
+              <div className="mt-8">
+                <AnalyticsDashboard
+                  data={{
+                    views: analyticsSummary.sessions * 100,
+                    uniqueViews: analyticsSummary.sessions * 80,
+                    avgWatchTime: 245,
+                    completionRate: 67.5,
+                    paidUnlocks: analyticsSummary.choices * 12,
+                    revenue: analyticsSummary.sessions * 100 * 0.99,
+                    conversionRate: 8.3,
+                    bounceRate: 32.1,
+                    dailyData: [
+                      { date: '周一', views: 1200, revenue: 120, conversions: 15 },
+                      { date: '周二', views: 1500, revenue: 180, conversions: 22 },
+                      { date: '周三', views: 1100, revenue: 90, conversions: 11 },
+                      { date: '周四', views: 1800, revenue: 240, conversions: 30 },
+                      { date: '周五', views: 2200, revenue: 350, conversions: 42 },
+                      { date: '周六', views: 2800, revenue: 420, conversions: 55 },
+                      { date: '周日', views: 2500, revenue: 380, conversions: 48 },
+                    ],
+                    funnelData: [
+                      { stage: '浏览', count: 10000, percentage: 100 },
+                      { stage: '点击选择', count: 6500, percentage: 65 },
+                      { stage: '观看付费节点', count: 3200, percentage: 32 },
+                      { stage: '付费解锁', count: 830, percentage: 8.3 },
+                      { stage: '完成结局', count: 675, percentage: 6.75 },
+                    ],
+                    abTests: [
+                      {
+                        id: 'ab_001',
+                        name: '付费节点弹窗文案测试',
+                        variantA: { name: '原版文案', conversions: 45, total: 500 },
+                        variantB: { name: '新版文案', conversions: 58, total: 500 },
+                        status: 'completed',
+                      },
+                      {
+                        id: 'ab_002',
+                        name: '预览时长测试',
+                        variantA: { name: '30秒预览', conversions: 38, total: 400 },
+                        variantB: { name: '60秒预览', conversions: 42, total: 400 },
+                        status: 'running',
+                      },
+                    ],
+                  }}
+                />
               </div>
             </section>
 
