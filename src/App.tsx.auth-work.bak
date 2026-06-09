@@ -1,0 +1,3767 @@
+﻿import {
+  type ChangeEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+import {
+  handleAuthCallback,
+  login as netlifyIdentityLogin,
+  logout as netlifyIdentityLogout,
+  signup as netlifyIdentitySignup,
+  getUser as getNetlifyIdentityUser,
+  onAuthChange,
+  AUTH_EVENTS,
+  AuthError,
+  MissingIdentityError,
+  type User as NetlifyIdentityUser,
+} from '@netlify/identity'
+import {
+  BarChart3,
+  Bot,
+  ChevronRight,
+  CheckCircle2,
+  Clapperboard,
+  Download,
+  FileText,
+  GitBranch,
+  KeyRound,
+  Layers3,
+  Play,
+  Plus,
+  RotateCcw,
+  Rocket,
+  Save,
+  Search,
+  Share2,
+  ShieldCheck,
+  Sparkles,
+  TerminalSquare,
+  Trash2,
+  Upload,
+  Users,
+  Wand2,
+} from 'lucide-react'
+import './App.css'
+import {
+  acceptInvitation,
+  cancelWorkspaceInvitation,
+  createRuntimeOrder,
+  createWorkspace,
+  DEFAULT_WORKSPACE_ID,
+  fetchAuditLog,
+  fetchAiUsageEvents,
+  fetchAuthProvider,
+  fetchAnalyticsEvents,
+  fetchContentSafetyReviews,
+  fetchEmailProvider,
+  fetchHealth,
+  fetchInviteDeliveries,
+  fetchPublishedBuild,
+  fetchProjectBuilds,
+  fetchRemoteProjects,
+  fetchRuntimeOrders,
+  fetchSession,
+  fetchWorkspaces,
+  fetchWorkspaceMembers,
+  generateAiDraft,
+  inviteWorkspaceMember,
+  login as localApiLogin,
+  logout as localApiLogout,
+  publishRemoteBuild,
+  recordRuntimeEvent,
+  requestEmailLoginCode,
+  resendWorkspaceInvitation,
+  saveRemoteProject,
+  scanProjectContentSafety,
+  updateInviteDelivery,
+  updateRemoteProject,
+  verifyEmailLoginCode,
+} from './api'
+
+type NodeKind = 'Hook' | 'Choice' | 'Puzzle' | 'Ending'
+
+type StoryChoice = {
+  id: string
+  label: string
+  targetNodeId: string
+  condition: string
+}
+
+type StoryNode = {
+  id: string
+  title: string
+  kind: NodeKind
+  summary: string
+  metric: string
+  choices: StoryChoice[]
+}
+
+type StoryVariable = {
+  id: string
+  label: string
+  type: 'number' | 'boolean' | 'text'
+  defaultValue: string
+}
+
+type Character = {
+  name: string
+  role: string
+  trait: string
+  color: string
+}
+
+type StoryProject = {
+  id: string
+  title: string
+  template: string
+  publish: PublishSettings
+  modelRouting: ModelRouting
+  nodes: StoryNode[]
+  variables: StoryVariable[]
+  characters: Character[]
+  lifecycleStatus?: 'active' | 'archived'
+  archivedAt?: string | null
+  updatedAt: string
+}
+
+type RuntimeState = Record<string, string>
+
+type PublishSettings = {
+  status: 'Draft' | 'Beta' | 'Public'
+  visibility: 'Private' | 'Unlisted' | 'Public'
+  category: string
+  audience: string
+  monetization: 'Free' | 'Paid Ending' | 'Paid Chapter'
+  price: string
+}
+
+type ModelRouting = {
+  market: 'China Mainland' | 'Global'
+  defaultProvider: string
+  openaiPolicy: 'Disabled for China public launch' | 'Global only' | 'Research only'
+  contentSafety: 'Required'
+  fallbackProvider: string
+}
+
+type GalleryItem = {
+  id: string
+  title: string
+  category: string
+  status: string
+  completion: string
+}
+
+type PublishBuild = {
+  id: string
+  projectId?: string
+  workspaceId?: string
+  version: number
+  status: string
+  visibility?: string
+  runtimeUrl: string
+  snapshot?: StoryProject
+  contentSafety?: {
+    reviewId?: string
+    status?: string
+    flagCount?: number
+    blockingCount?: number
+    reviewCount?: number
+    noticeCount?: number
+  }
+  createdAt: string
+}
+
+type WorkspaceSession = {
+  user: {
+    id: string
+    displayName: string
+    email: string
+    role: string
+    avatarInitials?: string
+  }
+  workspace: {
+    id: string
+    name: string
+    plan: string
+  }
+  membership: {
+    role: string
+    permissions: string[]
+  }
+}
+
+type WorkspaceSummary = {
+  id: string
+  name: string
+  plan: string
+}
+
+type WorkspaceMember = {
+  id: string
+  role: string
+  permissions: string[]
+  status?: string
+  inviteUrl?: string
+  inviteExpiresAt?: string
+  user?: WorkspaceSession['user']
+}
+
+type AuthProviderStatus = {
+  provider: string
+  mode: string
+  requestScoped: boolean
+  tokenPersistence: string
+  productionReady: boolean
+}
+
+type EmailProviderStatus = {
+  provider: string
+  webhookConfigured: boolean
+  apiKeyConfigured: boolean
+  callbackSecretConfigured: boolean
+  callbackSignatureMode: string
+  tencentSes?: {
+    configured: boolean
+    dryRun: boolean
+    endpoint: string
+    region: string
+    fromEmailConfigured: boolean
+    secretIdConfigured: boolean
+    secretKeyConfigured: boolean
+    templateConfigured: boolean
+    readiness: Array<{
+      id: string
+      label: string
+      ok: boolean
+      action: string
+    }>
+    missing: Array<{
+      id: string
+      label: string
+      ok: boolean
+      action: string
+    }>
+  }
+  aliyunDirectMail?: {
+    configured: boolean
+    dryRun: boolean
+    endpoint: string
+    region: string
+    accountNameConfigured: boolean
+    accessKeyIdConfigured: boolean
+    accessKeySecretConfigured: boolean
+    readiness: Array<{
+      id: string
+      label: string
+      ok: boolean
+      action: string
+    }>
+    missing: Array<{
+      id: string
+      label: string
+      ok: boolean
+      action: string
+    }>
+  }
+  recommendations: Array<{
+    id: string
+    displayName: string
+    market: string
+    priority: number
+    fit: string
+    callbackMode: string
+    notes: string
+  }>
+  productionReady: boolean
+}
+
+type StorageHealth = {
+  driver: string
+  path: string | null
+  databaseUrlConfigured: boolean
+  productionReady: boolean
+  readiness: Array<{
+    id: string
+    label: string
+    ok: boolean
+    action: string
+  }>
+  missing: Array<{
+    id: string
+    label: string
+    ok: boolean
+    action: string
+  }>
+}
+
+type CommercialReadiness = {
+  status: 'pass' | 'blocked'
+  passed: number
+  total: number
+  items: Array<{
+    id: string
+    area: string
+    label: string
+    ok: boolean
+    action: string
+    missingFields: string[]
+  }>
+  missing: Array<{
+    id: string
+    area: string
+    label: string
+    ok: boolean
+    action: string
+    missingFields: string[]
+  }>
+}
+
+type ApiHealth = {
+  ok: boolean
+  storage: StorageHealth
+  commercialReadiness: CommercialReadiness
+}
+
+type InviteDelivery = {
+  id: string
+  provider: string
+  to: string
+  role: string
+  status: string
+  inviteUrl: string
+  expiresAt?: string
+  createdAt: string
+  updatedAt?: string
+  errorMessage?: string
+}
+
+type AuditEntry = {
+  id: string
+  action: string
+  targetType: string
+  targetId: string
+  workspaceId?: string
+  metadata?: {
+    projectId?: string
+    title?: string
+    version?: number
+    [key: string]: unknown
+  }
+  createdAt: string
+}
+
+type AnalyticsEvent = {
+  id: string
+  workspaceId: string
+  projectId: string
+  buildId: string
+  sessionId: string
+  eventName: string
+  nodeId?: string | null
+  choiceId?: string | null
+  metadata?: {
+    choiceLabel?: string
+    targetNodeId?: string
+    targetKind?: string
+    version?: number
+    [key: string]: unknown
+  }
+  createdAt: string
+}
+
+type PaymentOrder = {
+  id: string
+  workspaceId: string
+  projectId: string
+  buildId: string
+  userId?: string | null
+  sessionId: string
+  provider: string
+  status: 'pending' | 'paid' | 'failed' | 'refunded'
+  amount: number
+  currency: string
+  monetization: string
+  itemType: string
+  itemId?: string | null
+  unlockNodeIds: string[]
+  metadata?: {
+    sandbox?: boolean
+    price?: string
+    title?: string
+    checkoutMode?: string
+    [key: string]: unknown
+  }
+  paidAt?: string | null
+  createdAt: string
+}
+
+type AiUsageEvent = {
+  id: string
+  workspaceId: string
+  projectId?: string | null
+  task: string
+  providerId: string
+  model: string
+  status: string
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+  estimatedCost: string
+  currency: string
+  latencyMs: number
+  outputSummary?: {
+    title?: string
+    nodeCount?: number
+    variableCount?: number
+    characterCount?: number
+    qualityCheckCount?: number
+  }
+  createdAt: string
+}
+
+type ContentSafetyReview = {
+  id: string
+  workspaceId: string
+  projectId: string
+  provider: string
+  policyVersion: string
+  status: 'passed' | 'needs_review' | 'blocked'
+  passed: boolean
+  flagCount: number
+  blockingCount: number
+  reviewCount: number
+  noticeCount: number
+  flags: Array<{
+    id: string
+    category: string
+    severity: 'notice' | 'review' | 'block'
+    term: string
+    path: string
+    snippet: string
+    action: string
+  }>
+  summary?: {
+    scannedFields?: number
+    nodeCount?: number
+    characterCount?: number
+    policy?: string
+  }
+  createdAt: string
+}
+
+type AiGenerationResult = {
+  providerId: string
+  model: string
+  task: string
+  status: string
+  output: {
+    title?: string
+    nodes?: StoryNode[]
+    variables?: StoryVariable[]
+    characters?: Character[]
+    qualityChecks?: string[]
+    note?: string
+  }
+  usage?: {
+    inputTokens?: number
+    outputTokens?: number
+    totalTokens?: number
+    estimatedCost?: string
+  }
+  usageEvent?: AiUsageEvent
+}
+
+const roleOptions = [
+  { value: 'editor', label: 'editor 路 鍒涗綔缂栬緫' },
+  { value: 'analyst', label: 'analyst 路 鏁版嵁鍒嗘瀽' },
+  { value: 'viewer', label: 'viewer 路 鍙鏌ョ湅' },
+  { value: 'owner', label: 'owner 路 绠＄悊鍛?' },
+]
+
+const auditActionOptions = [
+  { value: 'all', label: '鍏ㄩ儴鍔ㄤ綔' },
+  { value: 'project.created', label: '鍒涘缓浣滃搧' },
+  { value: 'project.updated', label: '鏇存柊浣滃搧' },
+  { value: 'build.created', label: '鐢熸垚鍙戝竷鍖?' },
+  { value: 'content_safety.scanned', label: '鍐呭瀹夊叏鎵弿' },
+  { value: 'payment.order_created', label: '鍒涘缓鏀粯璁㈠崟' },
+  { value: 'member.invited', label: '閭€璇锋垚鍛?' },
+  { value: 'workspace.created', label: '鍒涘缓宸ヤ綔鍖?' },
+]
+
+const defaultPublishSettings: PublishSettings = {
+  status: 'Beta',
+  visibility: 'Unlisted',
+  category: '鎮枒浜掑姩鐭墽',
+  audience: '鐭墽鍒涗綔鑰?/ 鎮枒鐜╁',
+  monetization: 'Paid Ending',
+  price: '9.9',
+}
+
+const defaultModelRouting: ModelRouting = {
+  market: 'China Mainland',
+  defaultProvider: 'DeepSeek / 閫氫箟鍗冮棶 / 璞嗗寘 / 鏅鸿氨 GLM',
+  openaiPolicy: 'Disabled for China public launch',
+  contentSafety: 'Required',
+  fallbackProvider: 'Kimi / MiniMax / 鑵捐娣峰厓',
+}
+
+const STORAGE_KEY = 'playdrama.storyProject.v1'
+const WORKSPACE_STORAGE_KEY = 'playdrama.activeWorkspace.v1'
+const nodeKinds: NodeKind[] = ['Hook', 'Choice', 'Puzzle', 'Ending']
+const variableTypes: StoryVariable['type'][] = ['number', 'boolean', 'text']
+
+function choice(id: string, label: string, targetNodeId: string, condition = '') {
+  return { id, label, targetNodeId, condition }
+}
+
+const initialNodes: StoryNode[] = [
+  {
+    id: 'S01',
+    title: '鍗堝鏉ョ數',
+    kind: 'Hook',
+    summary: '濂充富鏀跺埌澶辫釜鍝ュ摜鐨勮闊筹紝鑳屾櫙閲屽嚭鐜版棫鍖婚櫌骞挎挱銆?',
+    metric: '94% 缁х画',
+    choices: [
+      choice('C01', '鎺ュ惉绗簩閫氱數璇?', 'S02'),
+      choice('C02', '鍥炴嫧闄岀敓鍙风爜', 'S03', '绾跨储 >= 1'),
+    ],
+  },
+  {
+    id: 'S02',
+    title: '闂ㄥ崼鐨勮皫瑷€',
+    kind: 'Choice',
+    summary: '鐜╁閫夋嫨杩介棶闂ㄥ崼銆佺炕鐩戞帶锛屾垨鐩存帴杩涘叆灏侀攣妤煎眰銆?',
+    metric: '3 鏉″垎鏀?',
+    choices: [
+      choice('C03', '杩介棶闂ㄥ崼', 'S03'),
+      choice('C04', '缈荤湅鐩戞帶', 'S03', '淇′换 < 2'),
+      choice('C05', '杩涘叆灏侀攣妤煎眰', 'S04', '閽ュ寵 = true'),
+    ],
+  },
+  {
+    id: 'S03',
+    title: '鐥呭巻瀵嗙爜',
+    kind: 'Puzzle',
+    summary: '鏀堕泦涓夋潯绾跨储鍚庤緭鍏ユ。妗堟煖瀵嗙爜锛屽け璐ヨЕ鍙戣鎶ャ€?',
+    metric: '42% 瑙ｅ紑',
+    choices: [
+      choice('C06', '杈撳叆 0714', 'S04', '绾跨储 >= 3'),
+      choice('C07', '缁х画瀵绘壘绾跨储', 'S02'),
+    ],
+  },
+  {
+    id: 'S04',
+    title: '鍦颁笅瀹ょ湡鐩?',
+    kind: 'Ending',
+    summary: '鏍规嵁绾跨储瀹屾暣搴﹁繘鍏ユ櫘閫氱粨灞€銆侀殣钘忕粨灞€鎴栨浜＄粨灞€銆?',
+    metric: '5 涓粨灞€',
+    choices: [
+      choice('C08', '鍏紑鐪熺浉', 'S04', '绾跨储 >= 3'),
+      choice('C09', '闅愯棌璇佹嵁', 'S04', '淇′换 >= 2'),
+    ],
+  },
+]
+
+const initialCharacters: Character[] = [
+  {
+    name: '鏋楅浘',
+    role: '涓昏 / 璋冩煡璁拌€?',
+    trait: '鍐烽潤銆佹晱閿愩€佸鎬曞け鍘讳翰浜?',
+    color: '#2f80ed',
+  },
+  {
+    name: '娌堟棦鐧?',
+    role: '鍖荤敓 / 鍙枒鐩熷弸',
+    trait: '娓╁拰銆佸厠鍒躲€侀殣鐬掑叧閿蹇?',
+    color: '#14a06f',
+  },
+  {
+    name: '鍛ㄧ牃',
+    role: '闂ㄥ崼 / 绾跨储瀹堥棬浜?',
+    trait: '璐储銆佽儐灏忋€佺煡閬撳湴涓嬪鍏ュ彛',
+    color: '#d97904',
+  },
+]
+
+const initialVariables: StoryVariable[] = [
+  { id: 'clues', label: '绾跨储', type: 'number', defaultValue: '0' },
+  { id: 'trust', label: '淇′换', type: 'number', defaultValue: '1' },
+  { id: 'key', label: '閽ュ寵', type: 'boolean', defaultValue: 'false' },
+]
+
+const sampleProject: StoryProject = {
+  id: 'playdrama-hospital-001',
+  title: '鏃у尰闄㈢殑绗竷閫氱數璇?',
+  template: '鎮枒鎺㈡ v1',
+  publish: defaultPublishSettings,
+  modelRouting: defaultModelRouting,
+  nodes: initialNodes,
+  variables: initialVariables,
+  characters: initialCharacters,
+  updatedAt: new Date().toISOString(),
+}
+
+function normalizeChoices(node: Partial<StoryNode>, nodeIndex: number): StoryChoice[] {
+  const rawChoices = Array.isArray(node.choices) ? node.choices : []
+  return rawChoices.map((rawChoice, choiceIndex) => {
+    if (typeof rawChoice === 'string') {
+      return choice(
+        `C${nodeIndex + 1}-${choiceIndex + 1}`,
+        rawChoice,
+        initialNodes[Math.min(nodeIndex + 1, initialNodes.length - 1)].id,
+      )
+    }
+
+    const candidate = rawChoice as Partial<StoryChoice>
+    return {
+      id: candidate.id || `C${nodeIndex + 1}-${choiceIndex + 1}`,
+      label: candidate.label || '鏂扮殑閫夋嫨',
+      targetNodeId: candidate.targetNodeId || node.id || initialNodes[0].id,
+      condition: candidate.condition || '',
+    }
+  })
+}
+
+function normalizeProject(value: unknown): StoryProject {
+  if (!value || typeof value !== 'object') return sampleProject
+  const project = value as Partial<StoryProject>
+
+  if (
+    typeof project.id !== 'string' ||
+    typeof project.title !== 'string' ||
+    typeof project.template !== 'string' ||
+    !Array.isArray(project.nodes) ||
+    project.nodes.length === 0 ||
+    !Array.isArray(project.characters)
+  ) {
+    return sampleProject
+  }
+
+  const nodes = project.nodes.map((node, index) => ({
+    id: node.id || `S${String(index + 1).padStart(2, '0')}`,
+    title: node.title || '鏈懡鍚嶈妭鐐?',
+    kind: node.kind || 'Choice',
+    summary: node.summary || '',
+    metric: node.metric || '寰呮祴璇?',
+    choices: normalizeChoices(node, index),
+  }))
+
+  return {
+    id: project.id,
+    title: project.title,
+    template: project.template,
+    publish: project.publish || defaultPublishSettings,
+    modelRouting: project.modelRouting || defaultModelRouting,
+    nodes,
+    variables: Array.isArray(project.variables) ? project.variables : initialVariables,
+    characters: project.characters,
+    lifecycleStatus: project.lifecycleStatus || 'active',
+    archivedAt: project.archivedAt || null,
+    updatedAt: project.updatedAt || new Date().toISOString(),
+  }
+}
+
+function loadStoredProject() {
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY)
+    return stored ? normalizeProject(JSON.parse(stored)) : sampleProject
+  } catch {
+    return sampleProject
+  }
+}
+
+function loadActiveWorkspaceId() {
+  try {
+    return window.localStorage.getItem(WORKSPACE_STORAGE_KEY) || DEFAULT_WORKSPACE_ID
+  } catch {
+    return DEFAULT_WORKSPACE_ID
+  }
+}
+
+function createRuntimeState(variables: StoryVariable[]): RuntimeState {
+  return variables.reduce<RuntimeState>((state, variable) => {
+    state[variable.label] = variable.defaultValue
+    state[variable.id] = variable.defaultValue
+    return state
+  }, {})
+}
+
+function compareValues(left: string, operator: string, right: string) {
+  const normalizedRight = right.replace(/^["']|["']$/g, '')
+  const leftNumber = Number(left)
+  const rightNumber = Number(normalizedRight)
+  const bothNumeric = !Number.isNaN(leftNumber) && !Number.isNaN(rightNumber)
+
+  if (bothNumeric) {
+    if (operator === '>=') return leftNumber >= rightNumber
+    if (operator === '<=') return leftNumber <= rightNumber
+    if (operator === '>') return leftNumber > rightNumber
+    if (operator === '<') return leftNumber < rightNumber
+    if (operator === '=' || operator === '==') return leftNumber === rightNumber
+    if (operator === '!=' || operator === '!==') return leftNumber !== rightNumber
+  }
+
+  const normalizedLeft = left.toLowerCase()
+  const normalizedRightLower = normalizedRight.toLowerCase()
+  if (operator === '=' || operator === '==') return normalizedLeft === normalizedRightLower
+  if (operator === '!=' || operator === '!==') return normalizedLeft !== normalizedRightLower
+  return false
+}
+
+function evaluateCondition(condition: string, state: RuntimeState) {
+  const trimmed = condition.trim()
+  if (!trimmed) return true
+
+  const match = trimmed.match(/^(.+?)\s*(>=|<=|!==|!=|==|=|>|<)\s*(.+)$/)
+  if (!match) return false
+
+  const [, rawKey, operator, rawValue] = match
+  const key = rawKey.trim()
+  const currentValue = state[key] ?? ''
+  return compareValues(currentValue, operator, rawValue.trim())
+}
+
+function sortBuildHistory(builds: PublishBuild[]) {
+  return [...builds].sort((left, right) => {
+    if (right.version !== left.version) return right.version - left.version
+    return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+  })
+}
+
+function App() {
+  const [project, setProject] = useState<StoryProject>(() => loadStoredProject())
+  const [previewOnly, setPreviewOnly] = useState(() =>
+    new URLSearchParams(window.location.search).get('preview') === '1' ||
+    Boolean(new URLSearchParams(window.location.search).get('build')),
+  )
+  const [previewBuildId, setPreviewBuildId] = useState(
+    () => new URLSearchParams(window.location.search).get('build') || '',
+  )
+  const [selectedNodeId, setSelectedNodeId] = useState(project.nodes[0].id)
+  const [runtimeNodeId, setRuntimeNodeId] = useState(project.nodes[0].id)
+  const [runtimeState, setRuntimeState] = useState<RuntimeState>(() =>
+    createRuntimeState(project.variables),
+  )
+  const [runtimePath, setRuntimePath] = useState(() => [project.nodes[0].id])
+  const [runtimeMessage, setRuntimeMessage] = useState('璇曠帺宸插噯澶?')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [saveState, setSaveState] = useState('宸插悓姝ユ湰鍦?')
+  const [buildState, setBuildState] = useState('灏氭湭鐢熸垚鍙戝竷鍖?')
+  const [aiState, setAiState] = useState('AI 鍙敓鎴愪笅涓€骞?')
+  const [publishedBuildId, setPublishedBuildId] = useState('')
+  const [publishBuilds, setPublishBuilds] = useState<PublishBuild[]>([])
+  const [session, setSession] = useState<WorkspaceSession | null>(null)
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState(loadActiveWorkspaceId)
+  const [workspaceList, setWorkspaceList] = useState<WorkspaceSummary[]>([])
+  const [newWorkspaceName, setNewWorkspaceName] = useState('鐭墽鍐呮祴宸ヤ綔鍖?')
+  const [workspaceState, setWorkspaceState] = useState('宸ヤ綔鍖哄凡鍑嗗')
+  const [projectList, setProjectList] = useState<StoryProject[]>([])
+  const [archivedProjectList, setArchivedProjectList] = useState<StoryProject[]>([])
+  const [showArchivedProjects, setShowArchivedProjects] = useState(false)
+  const [projectListState, setProjectListState] = useState('椤圭洰鍒楄〃宸插噯澶?')
+  const [members, setMembers] = useState<WorkspaceMember[]>([])
+  const [inviteDeliveries, setInviteDeliveries] = useState<InviteDelivery[]>([])
+  const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([])
+  const [analyticsEvents, setAnalyticsEvents] = useState<AnalyticsEvent[]>([])
+  const [aiUsageEvents, setAiUsageEvents] = useState<AiUsageEvent[]>([])
+  const [contentSafetyReviews, setContentSafetyReviews] = useState<ContentSafetyReview[]>([])
+  const [contentSafetyState, setContentSafetyState] = useState('鍐呭瀹夊叏寰呮壂鎻?')
+  const [paymentOrders, setPaymentOrders] = useState<PaymentOrder[]>([])
+  const [checkoutState, setCheckoutState] = useState('浠樿垂缁撳眬娌欑洅宸插噯澶?')
+  const [pendingPaidChoice, setPendingPaidChoice] = useState<StoryChoice | null>(null)
+  const [auditActionFilter, setAuditActionFilter] = useState('all')
+  const [inviteEmail, setInviteEmail] = useState('creator-beta@example.com')
+  const [inviteRole, setInviteRole] = useState('editor')
+  const [inviteState, setInviteState] = useState('鍙個璇峰唴娴嬫垚鍛?')
+  const [latestInviteUrl, setLatestInviteUrl] = useState('')
+  const [loginEmail, setLoginEmail] = useState('creator@example.com')
+  const [loginName, setLoginName] = useState('Creator')
+  const [loginPassword, setLoginPassword] = useState('')
+  const [loginCode, setLoginCode] = useState('')
+  const [authState, setAuthState] = useState('鏈湴鐧诲綍宸插噯澶?')
+  const [authProvider, setAuthProvider] = useState<AuthProviderStatus | null>(null)
+  const [emailProvider, setEmailProvider] = useState<EmailProviderStatus | null>(null)
+  const [storageHealth, setStorageHealth] = useState<StorageHealth | null>(null)
+  const [commercialReadiness, setCommercialReadiness] =
+    useState<CommercialReadiness | null>(null)
+  const initialProjectIdRef = useRef(project.id)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const runtimeSessionIdRef = useRef(`ses_${Date.now()}_${Math.random().toString(36).slice(2)}`)
+  const lastRecordedRuntimeNodeRef = useRef('')
+  const isNetlifyIdentityAuth = authProvider?.provider === 'netlify-identity'
+  const isEmailCodeAuth = authProvider?.provider === 'email-code'
+  const isExternalProviderAuth = Boolean(authProvider && authProvider.provider !== 'local-demo')
+  const isGenericProviderAuth = isExternalProviderAuth && !isNetlifyIdentityAuth && !isEmailCodeAuth
+
+  const storyNodes = project.nodes
+  const selectedNode =
+    storyNodes.find((node) => node.id === selectedNodeId) ?? storyNodes[0]
+  const runtimeNode =
+    storyNodes.find((node) => node.id === runtimeNodeId) ?? storyNodes[0]
+  const runtimeProgress = useMemo(() => {
+    const currentIndex = Math.max(
+      0,
+      storyNodes.findIndex((node) => node.id === runtimeNode.id),
+    )
+    const total = Math.max(1, storyNodes.length)
+    return {
+      current: currentIndex + 1,
+      total,
+      percent: Math.round(((currentIndex + 1) / total) * 100),
+    }
+  }, [runtimeNode.id, storyNodes])
+  const runtimeAllowedChoiceCount = useMemo(
+    () =>
+      runtimeNode.choices.filter((item) =>
+        evaluateCondition(item.condition, runtimeState),
+      ).length,
+    [runtimeNode.choices, runtimeState],
+  )
+  const runtimePathLabel = useMemo(() => runtimePath.join(' -> '), [runtimePath])
+  const projectHasRemoteRecord = useMemo(
+    () => projectList.some((item) => item.id === project.id),
+    [project.id, projectList],
+  )
+
+  const filteredNodes = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    if (!query) return storyNodes
+
+    return storyNodes.filter((node) =>
+      [node.id, node.title, node.kind, node.summary, node.metric]
+        .join(' ')
+        .toLowerCase()
+        .includes(query),
+    )
+  }, [searchQuery, storyNodes])
+
+  const connectionCount = storyNodes.reduce(
+    (total, node) => total + node.choices.filter((item) => item.targetNodeId).length,
+    0,
+  )
+
+  const metrics = [
+    {
+      label: '浣滃搧瀹屾垚搴?',
+      value: `${Math.min(100, storyNodes.length * 17)}%`,
+      icon: BarChart3,
+    },
+    { label: '鍒嗘敮杩炵嚎', value: connectionCount.toString(), icon: GitBranch },
+    {
+      label: '鐘舵€佸彉閲?',
+      value: project.variables.length.toString(),
+      icon: KeyRound,
+    },
+    { label: '棰勮鏃堕暱', value: `${storyNodes.length * 2}m 40s`, icon: Clapperboard },
+  ]
+
+  const galleryItems: GalleryItem[] = [
+    {
+      id: project.id,
+      title: project.title,
+      category: project.publish.category,
+      status: project.publish.status,
+      completion: `${Math.min(100, storyNodes.length * 17)}%`,
+    },
+    {
+      id: 'demo-romance-001',
+      title: '闆ㄥ閲嶉€㈢殑绗笁涓€夋嫨',
+      category: '鎭嬬埍澶氱粨灞€',
+      status: 'Template',
+      completion: '42%',
+    },
+    {
+      id: 'demo-horror-001',
+      title: '鐢垫鍋滃湪涓嶅瓨鍦ㄧ殑鍗佷笁灞?',
+      category: '鎭愭€栭€冪敓',
+      status: 'Template',
+      completion: '35%',
+    },
+  ]
+
+  const latestContentSafetyReview = useMemo(
+    () =>
+      contentSafetyReviews
+        .filter((review) => review.projectId === project.id)
+        .slice()
+        .sort(
+          (left, right) =>
+            new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+        )[0],
+    [contentSafetyReviews, project.id],
+  )
+  const contentSafetySummary = useMemo(() => {
+    const statusLabel =
+      latestContentSafetyReview?.status === 'blocked'
+        ? '闃绘柇'
+        : latestContentSafetyReview?.status === 'needs_review'
+          ? '闇€澶嶆牳'
+          : latestContentSafetyReview?.status === 'passed'
+            ? '閫氳繃'
+            : '鏈壂鎻?'
+    return {
+      statusLabel,
+      isClear: latestContentSafetyReview?.passed === true,
+      review: latestContentSafetyReview,
+      flags: latestContentSafetyReview?.flags || [],
+    }
+  }, [latestContentSafetyReview])
+  const paidEndingNodeIds = useMemo(
+    () =>
+      project.publish.monetization === 'Paid Ending'
+        ? storyNodes.filter((node) => node.kind === 'Ending').map((node) => node.id)
+        : [],
+    [project.publish.monetization, storyNodes],
+  )
+  const unlockedPaidNodeIds = useMemo(
+    () =>
+      new Set(
+        paymentOrders
+          .filter((order) => order.status === 'paid')
+          .flatMap((order) => order.unlockNodeIds || []),
+      ),
+    [paymentOrders],
+  )
+  const paidEndingUnlocked =
+    paidEndingNodeIds.length === 0 ||
+    paidEndingNodeIds.some((nodeId) => unlockedPaidNodeIds.has(nodeId))
+
+  const onboardingItems = [
+    { label: '瀹屾垚鍓ф儏涓荤嚎', done: storyNodes.length >= 4 },
+    { label: '璁剧疆鑷冲皯 3 涓鑹?, done: project.characters.length >= 3' },
+    { label: '閰嶇疆鐘舵€佸彉閲?, done: project.variables.length >= 3' },
+    { label: '鎺ラ€?5 鏉′互涓婂垎鏀?, done: connectionCount >= 5' },
+    { label: '璁剧疆鍙樼幇鏂瑰紡', done: project.publish.monetization !== 'Free' },
+    { label: '鍐呭瀹夊叏鎵弿閫氳繃', done: contentSafetySummary.isClear },
+    { label: '浠樿垂缁撳眬鍙В閿?', done: project.publish.monetization === 'Free' || paidEndingUnlocked },
+  ]
+
+  const commercialProgress = commercialReadiness
+    ? `${commercialReadiness.passed}/${commercialReadiness.total}`
+    : '鍚屾涓?'
+  const commercialStatusLabel =
+    commercialReadiness?.status === 'pass' ? '鍙伆搴﹀彂甯?' : '鍟嗙敤闂ㄧ鏈€氳繃'
+  const launchSignals = [
+    {
+      label: 'Database',
+      value: storageHealth?.productionReady ? 'Postgres online' : 'Waiting setup',
+      ok: Boolean(storageHealth?.productionReady),
+    },
+    {
+      label: 'Auth',
+      value: authProvider?.provider || 'local-demo',
+      ok: Boolean(authProvider && authProvider.provider !== 'local-demo'),
+    },
+    {
+      label: 'Readiness',
+      value: commercialProgress,
+      ok: commercialReadiness?.status === 'pass',
+    },
+  ]
+  const launchPipeline = [
+    { label: '鍒涗綔鍥捐氨', value: `${storyNodes.length} scenes`, ok: storyNodes.length >= 4 },
+    { label: '鍒嗘敮娴嬭瘯', value: `${connectionCount} links`, ok: connectionCount >= 5 },
+    {
+      label: '鍙戝竷鍖?',
+      value: publishedBuildId ? `#${publishedBuildId.slice(-6)}` : project.publish.status,
+      ok: Boolean(publishedBuildId) || project.publish.status !== 'Draft',
+    },
+  ]
+  const launchHeroStats = [
+    { label: '涓婄嚎杩涘害', value: commercialProgress },
+    { label: '鍗忎綔韬唤', value: session?.membership.role || 'owner' },
+    { label: '褰撳墠甯傚満', value: project.modelRouting.market },
+  ]
+
+  const projectAnalyticsEvents = useMemo(
+    () => analyticsEvents.filter((event) => event.projectId === project.id),
+    [analyticsEvents, project.id],
+  )
+  const analyticsSummary = useMemo(() => {
+    const sessions = new Set(projectAnalyticsEvents.map((event) => event.sessionId))
+    const choices = projectAnalyticsEvents.filter(
+      (event) => event.eventName === 'choice_selected',
+    )
+    const endings = projectAnalyticsEvents.filter(
+      (event) => event.eventName === 'ending_reached',
+    )
+    const nodeViews = projectAnalyticsEvents.filter(
+      (event) => event.eventName === 'node_viewed',
+    )
+    return {
+      sessions: sessions.size,
+      choices: choices.length,
+      endings: endings.length,
+      nodeViews: nodeViews.length,
+      recent: projectAnalyticsEvents.slice(-5).reverse(),
+    }
+  }, [projectAnalyticsEvents])
+  const analyticsDetail = useMemo(() => {
+    const nodeViews = new Map<string, number>()
+    const nodeChoices = new Map<string, number>()
+    const choiceCounts = new Map<string, number>()
+
+    for (const event of projectAnalyticsEvents) {
+      if (event.eventName === 'node_viewed' && event.nodeId) {
+        nodeViews.set(event.nodeId, (nodeViews.get(event.nodeId) || 0) + 1)
+      }
+      if (event.eventName === 'choice_selected') {
+        if (event.nodeId) {
+          nodeChoices.set(event.nodeId, (nodeChoices.get(event.nodeId) || 0) + 1)
+        }
+        if (event.choiceId) {
+          choiceCounts.set(event.choiceId, (choiceCounts.get(event.choiceId) || 0) + 1)
+        }
+      }
+    }
+
+    const nodeRows = storyNodes
+      .map((node) => ({
+        id: node.id,
+        title: node.title,
+        views: nodeViews.get(node.id) || 0,
+        choices: nodeChoices.get(node.id) || 0,
+      }))
+      .filter((row) => row.views > 0 || row.choices > 0)
+      .sort((left, right) => right.views + right.choices - (left.views + left.choices))
+      .slice(0, 4)
+
+    const choiceRows = selectedNode.choices
+      .map((choiceItem) => ({
+        id: choiceItem.id,
+        label: choiceItem.label,
+        count: choiceCounts.get(choiceItem.id) || 0,
+      }))
+      .sort((left, right) => right.count - left.count)
+
+    return { nodeRows, choiceRows }
+  }, [projectAnalyticsEvents, selectedNode.choices, storyNodes])
+
+  const projectAiUsageEvents = useMemo(
+    () => aiUsageEvents.filter((event) => event.projectId === project.id),
+    [aiUsageEvents, project.id],
+  )
+  const aiUsageSummary = useMemo(() => {
+    const totalCost = projectAiUsageEvents.reduce(
+      (sum, event) => sum + Number(event.estimatedCost || 0),
+      0,
+    )
+    const totalTokens = projectAiUsageEvents.reduce(
+      (sum, event) => sum + Number(event.totalTokens || 0),
+      0,
+    )
+    const latest = projectAiUsageEvents.slice(-5).reverse()
+    const currency = latest[0]?.currency || 'USD'
+    return {
+      calls: projectAiUsageEvents.length,
+      totalTokens,
+      totalCost,
+      currency,
+      latest,
+    }
+  }, [projectAiUsageEvents])
+
+  const recentAuditEntries = useMemo(
+    () => auditEntries.slice(-5).reverse(),
+    [auditEntries],
+  )
+
+  const projectTimelineEntries = useMemo(() => {
+    return auditEntries
+      .filter((entry) => {
+        const matchesProject =
+          entry.targetId === project.id || entry.metadata?.projectId === project.id
+        const matchesAction =
+          auditActionFilter === 'all' || entry.action === auditActionFilter
+        return matchesProject && matchesAction
+      })
+      .slice()
+      .reverse()
+  }, [auditActionFilter, auditEntries, project.id])
+
+  const applyProject = useCallback((nextProject: StoryProject, message: string) => {
+    setProject(nextProject)
+    setSelectedNodeId(nextProject.nodes[0].id)
+    setRuntimeNodeId(nextProject.nodes[0].id)
+    setRuntimeState(createRuntimeState(nextProject.variables))
+    setRuntimePath([nextProject.nodes[0].id])
+    setRuntimeMessage(message)
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextProject))
+  }, [])
+
+  const recordBuildEvent = useCallback(async (
+    buildId: string,
+    event: {
+      eventName: string
+      nodeId?: string | null
+      choiceId?: string | null
+      metadata?: Record<string, unknown>
+    },
+  ) => {
+    try {
+      const recorded = await recordRuntimeEvent<AnalyticsEvent>(buildId, {
+        sessionId: runtimeSessionIdRef.current,
+        ...event,
+      })
+      setAnalyticsEvents((current) =>
+        current.some((item) => item.id === recorded.id)
+          ? current
+          : [...current, recorded],
+      )
+    } catch {
+      // Runtime analytics should never block the player.
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!previewBuildId) return
+    let cancelled = false
+
+    async function loadPublishedBuild() {
+      setRuntimeMessage('姝ｅ湪鍔犺浇鍙戝竷浣滃搧')
+      try {
+        const { build, project: publishedProject } = await fetchPublishedBuild<
+          PublishBuild,
+          StoryProject
+        >(previewBuildId)
+        if (cancelled) return
+        const normalized = normalizeProject(publishedProject)
+        applyProject(normalized, `宸插姞杞藉彂甯冨寘 v${build.version}`)
+        setPublishedBuildId(build.id)
+        setBuildState(`宸插姞杞?v${build.version} 路 ${build.status}`)
+        setPublishBuilds((current) =>
+          sortBuildHistory([build, ...current.filter((item) => item.id !== build.id)]),
+        )
+        setPreviewOnly(true)
+        void recordBuildEvent(build.id, {
+          eventName: 'play_opened',
+          nodeId: normalized.nodes[0]?.id,
+          metadata: {
+            version: build.version,
+            runtimeUrl: window.location.href,
+          },
+        })
+      } catch {
+        if (!cancelled) setRuntimeMessage('鍙戝竷浣滃搧鍔犺浇澶辫触')
+      }
+    }
+
+    void loadPublishedBuild()
+
+    return () => {
+      cancelled = true
+    }
+  }, [applyProject, previewBuildId, recordBuildEvent])
+
+  useEffect(() => {
+    if (!publishedBuildId || !runtimeNode?.id) return
+    const eventKey = `${publishedBuildId}:${runtimeSessionIdRef.current}:${runtimeNode.id}`
+    if (lastRecordedRuntimeNodeRef.current === eventKey) return
+    lastRecordedRuntimeNodeRef.current = eventKey
+    void recordBuildEvent(publishedBuildId, {
+      eventName: 'node_viewed',
+      nodeId: runtimeNode.id,
+      metadata: {
+        nodeKind: runtimeNode.kind,
+        nodeTitle: runtimeNode.title,
+      },
+    })
+  }, [publishedBuildId, recordBuildEvent, runtimeNode?.id, runtimeNode?.kind, runtimeNode?.title])
+
+  useEffect(() => {
+    if (!publishedBuildId) return
+    let cancelled = false
+
+    async function loadRuntimeOrders() {
+      try {
+        const result = await fetchRuntimeOrders<PaymentOrder>(
+          publishedBuildId,
+          runtimeSessionIdRef.current,
+        )
+        if (cancelled) return
+        setPaymentOrders(result.orders)
+        setCheckoutState(
+          result.unlock.nodeIds.length > 0
+            ? '浠樿垂缁撳眬宸茶В閿?'
+            : '浠樿垂缁撳眬娌欑洅宸插噯澶?',
+        )
+      } catch {
+        if (!cancelled) setCheckoutState('鏀粯璁㈠崟鏈嶅姟鏈繛鎺?')
+      }
+    }
+
+    void loadRuntimeOrders()
+
+    return () => {
+      cancelled = true
+    }
+  }, [publishedBuildId])
+
+  useEffect(() => {
+    if (previewBuildId || !project.id || !projectHasRemoteRecord) return
+    let cancelled = false
+
+    async function loadBuildHistory() {
+      try {
+        const remoteBuilds = sortBuildHistory(
+          await fetchProjectBuilds<PublishBuild>(project.id),
+        )
+        if (cancelled) return
+        setPublishBuilds(remoteBuilds)
+        if (!publishedBuildId && remoteBuilds[0]) {
+          setPublishedBuildId(remoteBuilds[0].id)
+          setBuildState(`鏈€鏂?v${remoteBuilds[0].version} 路 ${remoteBuilds[0].status}`)
+        }
+      } catch {
+        if (!cancelled) setPublishBuilds([])
+      }
+    }
+
+    void loadBuildHistory()
+
+    return () => {
+      cancelled = true
+    }
+  }, [previewBuildId, project.id, projectHasRemoteRecord, publishedBuildId])
+
+  useEffect(() => {
+    if (previewBuildId || !project.id || !projectHasRemoteRecord) return
+    let cancelled = false
+
+    async function loadContentSafetyReviews() {
+      try {
+        const reviews = await fetchContentSafetyReviews<ContentSafetyReview>(project.id)
+        if (cancelled) return
+        setContentSafetyReviews(reviews)
+        const latest = reviews[0]
+        setContentSafetyState(
+          latest
+            ? `鏈€杩戞壂鎻忥細${latest.status} 路 ${latest.flagCount} 涓彁绀篳`
+            : '鍐呭瀹夊叏寰呮壂鎻?',
+        )
+      } catch {
+        if (!cancelled) setContentSafetyState('鍐呭瀹夊叏鏈嶅姟鏈繛鎺?')
+      }
+    }
+
+    void loadContentSafetyReviews()
+
+    return () => {
+      cancelled = true
+    }
+  }, [previewBuildId, project.id, projectHasRemoteRecord])
+
+  function formatIdentityError(error: unknown) {
+    if (error instanceof AuthError) {
+      if (error.status === 401) return '閭鎴栧瘑鐮佷笉姝ｇ‘'
+      if (error.status === 403) return '褰撳墠绔欑偣鏈紑鏀炬敞鍐屾垨鐧诲綍'
+      if (error.status === 422) return '閭鎴栧瘑鐮佹牸寮忎笉绗﹀悎瑕佹眰'
+      return error.message
+    }
+    if (error instanceof MissingIdentityError) {
+      return 'Netlify Identity 灏氭湭鍦ㄧ珯鐐瑰惎鐢?'
+    }
+    return error instanceof Error ? error.message : '鐧诲綍鏈嶅姟鏆備笉鍙敤'
+  }
+
+  const refreshTeamState = useCallback(async (workspaceId: string) => {
+    const [
+      remoteSession,
+      remoteMembers,
+      remoteAuditLog,
+      remoteAuthProvider,
+      remoteEmailProvider,
+      remoteHealth,
+      remoteInviteDeliveries,
+      remoteAnalyticsEvents,
+      remoteAiUsageEvents,
+    ] = await Promise.all([
+      fetchSession<WorkspaceSession>(workspaceId),
+      fetchWorkspaceMembers<WorkspaceMember>(workspaceId),
+      fetchAuditLog<AuditEntry>(),
+      fetchAuthProvider<AuthProviderStatus>(),
+      fetchEmailProvider<EmailProviderStatus>(),
+      fetchHealth<ApiHealth>(),
+      fetchInviteDeliveries<InviteDelivery>(workspaceId),
+      fetchAnalyticsEvents<AnalyticsEvent>(),
+      fetchAiUsageEvents<AiUsageEvent>(workspaceId),
+    ])
+    const remoteWorkspaces = await fetchWorkspaces<WorkspaceSummary>()
+    setSession(remoteSession)
+    setWorkspaceList(remoteWorkspaces)
+    setMembers(remoteMembers)
+    setAuditEntries(remoteAuditLog)
+    setAuthProvider(remoteAuthProvider)
+    setEmailProvider(remoteEmailProvider)
+    setStorageHealth(remoteHealth.storage)
+    setCommercialReadiness(remoteHealth.commercialReadiness)
+    setInviteDeliveries(remoteInviteDeliveries)
+    setAnalyticsEvents(remoteAnalyticsEvents)
+    setAiUsageEvents(remoteAiUsageEvents)
+    setWorkspaceState('宸ヤ綔鍖哄凡鍚屾')
+  }, [])
+
+  const syncIdentitySession = useCallback(
+    async (workspaceId = activeWorkspaceId) => {
+      const nextSession = await fetchSession<WorkspaceSession>(workspaceId)
+      setSession(nextSession)
+      setActiveWorkspaceId(nextSession.workspace.id)
+      window.localStorage.setItem(WORKSPACE_STORAGE_KEY, nextSession.workspace.id)
+      await refreshTeamState(nextSession.workspace.id)
+      return nextSession
+    },
+    [activeWorkspaceId, refreshTeamState],
+  )
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadPublicRuntimeStatus() {
+      try {
+        const [remoteAuthProvider, remoteEmailProvider, remoteHealth] = await Promise.all([
+          fetchAuthProvider<AuthProviderStatus>(),
+          fetchEmailProvider<EmailProviderStatus>(),
+          fetchHealth<ApiHealth>(),
+        ])
+        if (cancelled) return
+        setAuthProvider(remoteAuthProvider)
+        setEmailProvider(remoteEmailProvider)
+        setStorageHealth(remoteHealth.storage)
+        setCommercialReadiness(remoteHealth.commercialReadiness)
+      } catch {
+        if (!cancelled) setAuthState('璁よ瘉鏈嶅姟鐘舵€佹殏涓嶅彲鐢?')
+      }
+    }
+
+    void loadPublicRuntimeStatus()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isNetlifyIdentityAuth) return
+    let cancelled = false
+
+    async function loadIdentitySession() {
+      try {
+        await handleAuthCallback()
+        const currentUser = await getNetlifyIdentityUser()
+        if (cancelled) return
+        if (currentUser?.email) {
+          setLoginEmail(currentUser.email)
+          setLoginName(currentUser.name || currentUser.email.split('@')[0])
+          await syncIdentitySession(activeWorkspaceId)
+          if (!cancelled) setAuthState(`宸茬櫥褰曪細${currentUser.email}`)
+        } else {
+          setAuthState('璇蜂娇鐢ㄧ湡瀹炶处鍙风櫥褰?')
+        }
+      } catch (error) {
+        if (!cancelled) setAuthState(formatIdentityError(error))
+      }
+    }
+
+    const unsubscribe = onAuthChange((event, user: NetlifyIdentityUser | null) => {
+      if (event === AUTH_EVENTS.LOGIN && user?.email) {
+        setLoginEmail(user.email)
+        setLoginName(user.name || user.email.split('@')[0])
+        void syncIdentitySession(activeWorkspaceId)
+      }
+      if (event === AUTH_EVENTS.LOGOUT) {
+        setAuthState('宸查€€鍑虹湡瀹炶处鍙?')
+      }
+    })
+
+    void loadIdentitySession()
+
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
+  }, [activeWorkspaceId, isNetlifyIdentityAuth, refreshTeamState, syncIdentitySession])
+
+  useEffect(() => {
+    if (previewBuildId) return
+    let cancelled = false
+
+    async function loadRemoteProject() {
+      try {
+        await refreshTeamState(activeWorkspaceId)
+        const remoteProjects = await fetchRemoteProjects<StoryProject>(activeWorkspaceId)
+        const allProjects = remoteProjects.map((item) => normalizeProject(item))
+        const normalizedProjects = allProjects.filter(
+          (item) => item.lifecycleStatus !== 'archived',
+        )
+        const archivedProjects = allProjects.filter(
+          (item) => item.lifecycleStatus === 'archived',
+        )
+        const remoteProject =
+          normalizedProjects.find((item) => item.id === initialProjectIdRef.current) ??
+          normalizedProjects[0]
+
+        if (cancelled) return
+
+        setProjectList(normalizedProjects)
+        setArchivedProjectList(archivedProjects)
+        setProjectListState(
+          normalizedProjects.length > 0
+            ? `宸插姞杞?${normalizedProjects.length} 涓綔鍝乣`
+            : '褰撳墠宸ヤ綔鍖烘殏鏃犱綔鍝?',
+        )
+
+        if (!remoteProject) {
+          setSaveState('褰撳墠宸ヤ綔鍖烘殏鏃犱綔鍝侊紝鍙繚瀛樺綋鍓嶉」鐩?')
+          return
+        }
+
+        applyProject(remoteProject, '宸蹭粠 API 鍚屾')
+        setSaveState('宸蹭粠 API 鍚屾')
+      } catch {
+        if (!cancelled) setSaveState('API 鏈繛鎺ワ紝浣跨敤鏈湴鏁版嵁')
+      }
+    }
+
+    loadRemoteProject()
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeWorkspaceId, applyProject, previewBuildId, refreshTeamState])
+
+  useEffect(() => {
+    const inviteTokenParam = new URLSearchParams(window.location.search).get('invite')
+    if (!inviteTokenParam) return
+    const inviteToken = inviteTokenParam
+
+    let cancelled = false
+
+    async function acceptInviteToken() {
+      setInviteState('姝ｅ湪鎺ュ彈閭€璇?')
+      try {
+        const nextSession = await acceptInvitation<WorkspaceSession>(inviteToken)
+        if (cancelled) return
+        setSession(nextSession)
+        setActiveWorkspaceId(nextSession.workspace.id)
+        window.localStorage.setItem(WORKSPACE_STORAGE_KEY, nextSession.workspace.id)
+        setInviteState('閭€璇峰凡鎺ュ彈')
+        await refreshTeamState(nextSession.workspace.id)
+      } catch {
+        if (!cancelled) setInviteState('閭€璇烽摼鎺ユ棤鏁堟垨宸插け鏁?')
+      }
+    }
+
+    void acceptInviteToken()
+
+    return () => {
+      cancelled = true
+    }
+  }, [refreshTeamState])
+
+  function updateProject(mutator: (current: StoryProject) => StoryProject) {
+    setProject((current) => ({
+      ...mutator(current),
+      updatedAt: new Date().toISOString(),
+    }))
+    setSaveState('鏈夋湭淇濆瓨淇敼')
+  }
+
+  function updatePublish(field: keyof PublishSettings, value: string) {
+  updateProject((current) => ({
+      ...current,
+      publish: { ...current.publish, [field]: value },
+    }))
+  }
+
+  function updateModelRouting(field: keyof ModelRouting, value: string) {
+    updateProject((current) => ({
+      ...current,
+      modelRouting: { ...current.modelRouting, [field]: value },
+    }))
+  }
+
+  function openPublishedBuildPreview(buildId: string) {
+    const previewUrl = `${window.location.origin}${window.location.pathname}?preview=1&build=${encodeURIComponent(buildId)}`
+    window.history.replaceState(null, '', previewUrl)
+    setPublishedBuildId(buildId)
+    setPreviewBuildId(buildId)
+    setPreviewOnly(true)
+    setRuntimeMessage('宸茶繘鍏ュ彂甯冨寘棰勮')
+  }
+
+  function openSharePreview() {
+    if (publishedBuildId) {
+      openPublishedBuildPreview(publishedBuildId)
+      void recordBuildEvent(publishedBuildId, {
+        eventName: 'share_preview_opened',
+        nodeId: runtimeNode.id,
+        metadata: {
+          projectId: project.id,
+        },
+      })
+      return
+    }
+
+    const previewUrl = `${window.location.origin}${window.location.pathname}?preview=1`
+    window.history.replaceState(null, '', previewUrl)
+    setPreviewOnly(true)
+    setRuntimeMessage('宸茶繘鍏ユ湰鍦板垎浜瑙?')
+  }
+
+  function exitSharePreview() {
+    window.history.replaceState(null, '', window.location.pathname)
+    setPreviewOnly(false)
+    setPreviewBuildId('')
+    setRuntimeMessage('宸茶繑鍥炲垱浣滃彴')
+  }
+
+  function restoreBuildSnapshot(build: PublishBuild) {
+    if (!build.snapshot) {
+      setBuildState('杩欎釜鍙戝竷鍖呮病鏈夊彲杞藉叆鐨勫揩鐓?')
+      return
+    }
+
+    const restoredProject = normalizeProject(build.snapshot)
+    applyProject(restoredProject, `宸茶浇鍏?v${build.version} 鍙戝竷蹇収`)
+    setPublishedBuildId(build.id)
+    setBuildState(`宸茶浇鍏?v${build.version} 路 ${build.status}`)
+  }
+
+  function restartRuntime(nextProject = project) {
+    const firstNode = nextProject.nodes[0]
+    lastRecordedRuntimeNodeRef.current = ''
+    setRuntimeNodeId(firstNode.id)
+    setRuntimeState(createRuntimeState(nextProject.variables))
+    setRuntimePath([firstNode.id])
+    setPendingPaidChoice(null)
+    setRuntimeMessage('宸查噸鏂板紑濮?')
+  }
+
+  function choiceRequiresPayment(item: StoryChoice) {
+    const target = storyNodes.find((node) => node.id === item.targetNodeId)
+    return (
+      Boolean(target) &&
+      target?.kind === 'Ending' &&
+      project.publish.monetization === 'Paid Ending' &&
+      !unlockedPaidNodeIds.has(target.id)
+    )
+  }
+
+  function moveToChoiceTarget(item: StoryChoice) {
+    const allowed = evaluateCondition(item.condition, runtimeState)
+    if (!allowed) {
+      setRuntimeMessage(`鏉′欢鏈弧瓒筹細${item.condition}`)
+      return
+    }
+
+    const target = storyNodes.find((node) => node.id === item.targetNodeId)
+    if (!target) {
+      setRuntimeMessage(`鐩爣鑺傜偣涓嶅瓨鍦細${item.targetNodeId}`)
+      return
+    }
+
+    setRuntimeNodeId(target.id)
+    setSelectedNodeId(target.id)
+    setRuntimePath((current) => [...current, target.id])
+    setRuntimeMessage(`杩涘叆 ${target.id} 路 ${target.title}`)
+
+    if (publishedBuildId) {
+      void recordBuildEvent(publishedBuildId, {
+        eventName: 'choice_selected',
+        nodeId: runtimeNode.id,
+        choiceId: item.id,
+        metadata: {
+          choiceLabel: item.label,
+          targetNodeId: target.id,
+          targetKind: target.kind,
+        },
+      })
+      if (target.kind === 'Ending') {
+        void recordBuildEvent(publishedBuildId, {
+          eventName: 'ending_reached',
+          nodeId: target.id,
+          metadata: {
+            endingTitle: target.title,
+          },
+        })
+      }
+    }
+  }
+
+  function playChoice(item: StoryChoice) {
+    if (choiceRequiresPayment(item)) {
+      setPendingPaidChoice(item)
+      setRuntimeMessage(`缁撳眬闇€瑙ｉ攣锛?{project.publish.price} 鍏僠`)
+      setCheckoutState('绛夊緟娌欑洅鏀粯纭')
+      return
+    }
+
+    moveToChoiceTarget(item)
+  }
+
+  async function unlockPaidEnding() {
+    if (!publishedBuildId || !pendingPaidChoice) {
+      setCheckoutState('璇峰厛鐢熸垚鍙戝竷鍖呭啀瑙ｉ攣')
+      return
+    }
+    const target = storyNodes.find((node) => node.id === pendingPaidChoice.targetNodeId)
+    if (!target) {
+      setCheckoutState('鐩爣缁撳眬涓嶅瓨鍦?')
+      return
+    }
+
+    setCheckoutState('姝ｅ湪鍒涘缓娌欑洅璁㈠崟')
+    try {
+      const result = await createRuntimeOrder<PaymentOrder>(publishedBuildId, {
+        sessionId: runtimeSessionIdRef.current,
+        itemType: 'ending',
+        itemId: target.id,
+        unlockNodeIds: paidEndingNodeIds,
+      })
+      setPaymentOrders((current) => [
+        result.order,
+        ...current.filter((order) => order.id !== result.order.id),
+      ])
+      setPendingPaidChoice(null)
+      setCheckoutState(
+        result.order.status === 'paid'
+          ? `宸叉敮浠?${result.order.currency} ${(result.order.amount / 100).toFixed(2)}`
+          : '璁㈠崟宸插垱寤猴紝绛夊緟鏀粯纭',
+      )
+      moveToChoiceTarget(pendingPaidChoice)
+    } catch {
+      setCheckoutState('璁㈠崟鍒涘缓澶辫触锛欰PI 鏈繛鎺?')
+    }
+  }
+
+  function updateRuntimeValue(key: string, value: string) {
+    setRuntimeState((current) => ({ ...current, [key]: value }))
+    setRuntimeMessage('鍙橀噺宸叉洿鏂?')
+  }
+
+  function updateSelectedNode(field: keyof StoryNode, value: string) {
+    updateProject((current) => ({
+      ...current,
+      nodes: current.nodes.map((node) =>
+        node.id === selectedNodeId ? { ...node, [field]: value } : node,
+      ),
+    }))
+  }
+
+  function updateChoice(index: number, field: keyof StoryChoice, value: string) {
+    updateProject((current) => ({
+      ...current,
+      nodes: current.nodes.map((node) => {
+        if (node.id !== selectedNodeId) return node
+        const choices = [...node.choices]
+        choices[index] = { ...choices[index], [field]: value }
+        return { ...node, choices }
+      }),
+    }))
+  }
+
+  function addChoice() {
+    updateProject((current) => ({
+      ...current,
+      nodes: current.nodes.map((node) =>
+        node.id === selectedNodeId
+          ? {
+              ...node,
+              choices: [
+                ...node.choices,
+                choice(`C${Date.now()}`, '鏂扮殑閫夋嫨', node.id),
+              ],
+            }
+          : node,
+      ),
+    }))
+  }
+
+  function removeChoice(index: number) {
+    updateProject((current) => ({
+      ...current,
+      nodes: current.nodes.map((node) =>
+        node.id === selectedNodeId
+          ? {
+              ...node,
+              choices: node.choices.filter((_, choiceIndex) => choiceIndex !== index),
+            }
+          : node,
+      ),
+    }))
+  }
+
+  function addStoryNode() {
+    const nextNumber = storyNodes.length + 1
+    const nextNode: StoryNode = {
+      id: `S${String(nextNumber).padStart(2, '0')}`,
+      title: '鏂扮殑鍓ф儏鑺傜偣',
+      kind: 'Choice',
+      summary: '鎻忚堪杩欎竴骞曠殑鍐茬獊銆佺嚎绱㈠拰鐜╁闇€瑕佸仛鍑虹殑鍐冲畾銆?',
+      metric: '寰呮祴璇?',
+      choices: [choice(`C${Date.now()}`, '缁х画璋冩煡', selectedNode.id)],
+    }
+
+    updateProject((current) => ({ ...current, nodes: [...current.nodes, nextNode] }))
+    setSelectedNodeId(nextNode.id)
+    setSearchQuery('')
+  }
+
+  async function generateNextScene() {
+    const sourceProject = project
+    const sourceNode = selectedNode
+    setAiState('姝ｅ湪鐢熸垚涓嬩竴骞?..')
+
+    try {
+      const result = await generateAiDraft<AiGenerationResult>('expand-branch', {
+        project: sourceProject,
+        selectedNodeId: sourceNode.id,
+      })
+      const usageEvent = result.usageEvent
+      if (usageEvent) {
+        setAiUsageEvents((current) =>
+          current.some((event) => event.id === usageEvent.id)
+            ? current
+            : [...current, usageEvent],
+        )
+      }
+      const rawNodes = Array.isArray(result.output.nodes) ? result.output.nodes : []
+      if (rawNodes.length === 0) {
+        setAiState('AI 娌℃湁杩斿洖鍙敤鑺傜偣')
+        return
+      }
+
+      const usedIds = new Set(sourceProject.nodes.map((node) => node.id))
+      const originalIdMap = new Map<string, string>()
+      let nextNumber = sourceProject.nodes.length + 1
+      const allocateId = (preferredId: string) => {
+        if (preferredId && !usedIds.has(preferredId)) {
+          usedIds.add(preferredId)
+          return preferredId
+        }
+
+        let nextId = `S${String(nextNumber).padStart(2, '0')}`
+        nextNumber += 1
+        while (usedIds.has(nextId)) {
+          nextId = `S${String(nextNumber).padStart(2, '0')}`
+          nextNumber += 1
+        }
+        usedIds.add(nextId)
+        return nextId
+      }
+
+      const generatedNodes = rawNodes.map((node, index) => {
+        const nextId = allocateId(node.id)
+        originalIdMap.set(node.id, nextId)
+        return {
+          ...node,
+          id: nextId,
+          kind: nodeKinds.includes(node.kind) ? node.kind : 'Choice',
+          metric: node.metric || 'AI 鐢熸垚',
+          choices: Array.isArray(node.choices)
+            ? node.choices.map((item, choiceIndex) => ({
+                id: item.id || `AI-${Date.now()}-${index}-${choiceIndex}`,
+                label: item.label || '缁х画璋冩煡',
+                targetNodeId: item.targetNodeId || nextId,
+                condition: item.condition || '',
+              }))
+            : [],
+        }
+      })
+
+      const generatedNodeIds = new Set(generatedNodes.map((node) => node.id))
+      const remappedNodes = generatedNodes.map((node, index) => ({
+        ...node,
+        choices: node.choices.map((item) => ({
+          ...item,
+          targetNodeId:
+            originalIdMap.get(item.targetNodeId) ||
+            (generatedNodeIds.has(item.targetNodeId)
+              ? item.targetNodeId
+              : generatedNodes[index + 1]?.id || item.targetNodeId || node.id),
+        })),
+      }))
+      const firstGeneratedNode = remappedNodes[0]
+      const aiLink = choice(
+        `AI-LINK-${Date.now()}`,
+        `杩涘叆 ${firstGeneratedNode.title}`,
+        firstGeneratedNode.id,
+      )
+      const existingVariableIds = new Set(sourceProject.variables.map((item) => item.id))
+      const existingVariableLabels = new Set(sourceProject.variables.map((item) => item.label))
+      const generatedVariables = (result.output.variables || []).filter(
+        (item) => !existingVariableIds.has(item.id) && !existingVariableLabels.has(item.label),
+      )
+      const existingCharacterNames = new Set(sourceProject.characters.map((item) => item.name))
+      const generatedCharacters = (result.output.characters || []).filter(
+        (item) => !existingCharacterNames.has(item.name),
+      )
+
+      const nextProject: StoryProject = {
+        ...sourceProject,
+        nodes: [
+          ...sourceProject.nodes.map((node) =>
+            node.id === sourceNode.id &&
+            !node.choices.some((item) => item.targetNodeId === firstGeneratedNode.id)
+              ? { ...node, choices: [...node.choices, aiLink] }
+              : node,
+          ),
+          ...remappedNodes,
+        ],
+        variables: [...sourceProject.variables, ...generatedVariables],
+        characters: [...sourceProject.characters, ...generatedCharacters],
+        updatedAt: new Date().toISOString(),
+      }
+
+      const savedProject = await syncProjectToApi(nextProject)
+      setSelectedNodeId(firstGeneratedNode.id)
+      setRuntimeNodeId(firstGeneratedNode.id)
+      setRuntimeState(createRuntimeState(savedProject.variables))
+      setSearchQuery('')
+      setRuntimeMessage(`AI 宸茬敓鎴?${firstGeneratedNode.id} 路 ${firstGeneratedNode.title}`)
+      setAiState(
+        `${result.providerId} / ${result.model} 鐢熸垚 ${remappedNodes.length} 涓妭鐐?路 ${result.usageEvent?.currency || 'USD'} ${result.usageEvent?.estimatedCost || '0'}`,
+      )
+    } catch (error) {
+      setAiState(error instanceof Error ? `AI 鐢熸垚澶辫触锛?{error.message}` : 'AI 鐢熸垚澶辫触')
+    }
+  }
+
+  function removeStoryNode(nodeId: string) {
+    const nextNodes = storyNodes.filter((node) => node.id !== nodeId)
+    if (nextNodes.length === 0) return
+
+    updateProject((current) => ({
+      ...current,
+      nodes: nextNodes.map((node) => ({
+        ...node,
+        choices: node.choices.map((item) => ({
+          ...item,
+          targetNodeId:
+            item.targetNodeId === nodeId ? nextNodes[0].id : item.targetNodeId,
+        })),
+      })),
+    }))
+    if (selectedNodeId === nodeId) setSelectedNodeId(nextNodes[0].id)
+  }
+
+  function updateVariable(index: number, field: keyof StoryVariable, value: string) {
+    updateProject((current) => {
+      const variables = [...current.variables]
+      variables[index] = { ...variables[index], [field]: value }
+      return { ...current, variables }
+    })
+  }
+
+  function addVariable() {
+    updateProject((current) => ({
+      ...current,
+      variables: [
+        ...current.variables,
+        {
+          id: `var_${current.variables.length + 1}`,
+          label: '鏂板彉閲?',
+          type: 'number',
+          defaultValue: '0',
+        },
+      ],
+    }))
+  }
+
+  function removeVariable(index: number) {
+    updateProject((current) => ({
+      ...current,
+      variables: current.variables.filter((_, variableIndex) => variableIndex !== index),
+    }))
+  }
+
+  function updateCharacter(index: number, field: keyof Character, value: string) {
+    updateProject((current) => {
+      const characters = [...current.characters]
+      characters[index] = { ...characters[index], [field]: value }
+      return { ...current, characters }
+    })
+  }
+
+  function addCharacter() {
+    updateProject((current) => ({
+      ...current,
+      characters: [
+        ...current.characters,
+        {
+          name: '鏂拌鑹?',
+          role: '鍓ф儏鍏抽敭浜虹墿',
+          trait: '琛ュ厖瑙掕壊鎬ф牸銆佺瀵嗗拰鍔ㄦ満',
+          color: '#7c3aed',
+        },
+      ],
+    }))
+  }
+
+  function removeCharacter(index: number) {
+    updateProject((current) => ({
+      ...current,
+      characters: current.characters.filter(
+        (_, characterIndex) => characterIndex !== index,
+      ),
+    }))
+  }
+
+  async function syncProjectToApi(nextProject: StoryProject) {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextProject))
+    setProject(nextProject)
+
+    try {
+      const remoteProject = await saveRemoteProject(nextProject, activeWorkspaceId)
+      const normalized = normalizeProject(remoteProject)
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized))
+      setProject(normalized)
+      setProjectList((current) => {
+        const exists = current.some((item) => item.id === normalized.id)
+        return exists
+          ? current.map((item) => (item.id === normalized.id ? normalized : item))
+          : [normalized, ...current]
+      })
+      setProjectListState('椤圭洰鍒楄〃宸叉洿鏂?')
+      setSaveState('宸蹭繚瀛樺埌鏈湴鍜?API')
+      return normalized
+    } catch {
+      setSaveState('API 鏈繛鎺ワ紝宸蹭繚瀛樺埌鏈湴')
+      return nextProject
+    }
+  }
+
+  async function saveProject() {
+    const savedProject = { ...project, updatedAt: new Date().toISOString() }
+    setSaveState('姝ｅ湪淇濆瓨')
+    await syncProjectToApi(savedProject)
+  }
+
+  async function resetSampleProject() {
+    const nextProject = { ...sampleProject, updatedAt: new Date().toISOString() }
+    setProject(nextProject)
+    setSelectedNodeId(nextProject.nodes[0].id)
+    restartRuntime(nextProject)
+    setSearchQuery('')
+    setSaveState('姝ｅ湪閲嶇疆')
+    await syncProjectToApi(nextProject)
+  }
+
+  function exportProject() {
+    const payload = JSON.stringify(project, null, 2)
+    const blob = new Blob([payload], { type: 'application/json;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${project.title || 'playdrama-project'}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+    setSaveState('宸插鍑?JSON')
+  }
+
+  async function importProject(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    try {
+      const text = await file.text()
+      const nextProject = normalizeProject(JSON.parse(text))
+      setProject(nextProject)
+      setSelectedNodeId(nextProject.nodes[0].id)
+      restartRuntime(nextProject)
+      setSearchQuery('')
+      setSaveState('姝ｅ湪瀵煎叆')
+      await syncProjectToApi(nextProject)
+    } catch {
+      setSaveState('瀵煎叆澶辫触锛氭棤娉曡鍙?JSON')
+    } finally {
+      event.target.value = ''
+    }
+  }
+
+  async function scanContentSafety(sourceProject = project) {
+    setContentSafetyState('姝ｅ湪鎵弿鍐呭瀹夊叏')
+    try {
+      const savedProject = await syncProjectToApi({
+        ...sourceProject,
+        updatedAt: new Date().toISOString(),
+      })
+      const review = await scanProjectContentSafety<ContentSafetyReview>(savedProject.id)
+      setContentSafetyReviews((current) => [
+        review,
+        ...current.filter((item) => item.id !== review.id),
+      ])
+      setContentSafetyState(
+        review.status === 'blocked'
+          ? `鎵弿闃绘柇锛?{review.blockingCount} 涓珮椋庨櫓`
+          : review.status === 'needs_review'
+            ? `鎵弿闇€澶嶆牳锛?{review.reviewCount} 涓彁绀篳`
+            : `鎵弿閫氳繃锛?{review.noticeCount} 涓彁閱抈`,
+      )
+      return { savedProject, review }
+    } catch {
+      setContentSafetyState('鎵弿澶辫触锛欰PI 鏈繛鎺?')
+      return null
+    }
+  }
+
+  async function publishBuild() {
+    setBuildState('姝ｅ湪鐢熸垚鍙戝竷鍖?')
+    const safetyResult = await scanContentSafety(project)
+    if (!safetyResult) {
+      setBuildState('鍙戝竷澶辫触锛氬唴瀹瑰畨鍏ㄦ湭瀹屾垚')
+      return
+    }
+    if (!safetyResult.review.passed) {
+      setBuildState('鍙戝竷宸查樆鏂細鍐呭瀹夊叏鏈€氳繃')
+      return
+    }
+
+    try {
+      const build = await publishRemoteBuild<PublishBuild>(safetyResult.savedProject.id)
+      setBuildState(`宸茬敓鎴?v${build.version} 路 ${build.status}`)
+      setPublishedBuildId(build.id)
+      setPublishBuilds((current) =>
+        sortBuildHistory([build, ...current.filter((item) => item.id !== build.id)]),
+      )
+      setSaveState('鍙戝竷蹇収宸插啓鍏?API')
+      await refreshTeamState(activeWorkspaceId)
+    } catch {
+      setBuildState('鍙戝竷澶辫触锛欰PI 鏈繛鎺?')
+    }
+  }
+
+  async function inviteMember() {
+    setInviteState('姝ｅ湪閭€璇?')
+    try {
+      const member = await inviteWorkspaceMember<WorkspaceMember>({
+        email: inviteEmail,
+        role: inviteRole,
+        workspaceId: activeWorkspaceId,
+      })
+      setLatestInviteUrl(member.inviteUrl || '')
+      await refreshTeamState(activeWorkspaceId)
+      setInviteState('閭€璇峰凡鍐欏叆宸ヤ綔鍖?')
+    } catch {
+      setInviteState('閭€璇峰け璐ワ細璇锋鏌?API 鎴栭偖绠?')
+    }
+  }
+
+  async function resendInvitation(memberId: string) {
+    setInviteState('姝ｅ湪閲嶆柊鍙戦€侀個璇?')
+    try {
+      const member = await resendWorkspaceInvitation<WorkspaceMember>({
+        workspaceId: activeWorkspaceId,
+        memberId,
+      })
+      setLatestInviteUrl(member.inviteUrl || '')
+      await refreshTeamState(activeWorkspaceId)
+      setInviteState('閭€璇峰凡閲嶆柊鍙戦€?')
+    } catch {
+      setInviteState('閲嶆柊鍙戦€佸け璐ワ細閭€璇峰彲鑳藉凡鎺ュ彈鎴栧彇娑?')
+    }
+  }
+
+  async function cancelInvitation(memberId: string) {
+    setInviteState('姝ｅ湪鍙栨秷閭€璇?')
+    try {
+      await cancelWorkspaceInvitation<WorkspaceMember>({
+        workspaceId: activeWorkspaceId,
+        memberId,
+      })
+      await refreshTeamState(activeWorkspaceId)
+      setInviteState('閭€璇峰凡鍙栨秷')
+    } catch {
+      setInviteState('鍙栨秷澶辫触锛氶個璇峰彲鑳藉凡鎺ュ彈')
+    }
+  }
+
+  async function markDeliveryStatus(deliveryId: string, status: string) {
+    setInviteState('姝ｅ湪鏇存柊鎶曢€掔姸鎬?')
+    try {
+      await updateInviteDelivery<InviteDelivery>({
+        workspaceId: activeWorkspaceId,
+        deliveryId,
+        status,
+      })
+      await refreshTeamState(activeWorkspaceId)
+      setInviteState(`鎶曢€掔姸鎬佸凡鏇存柊涓?${status}`)
+    } catch {
+      setInviteState('鎶曢€掔姸鎬佹洿鏂板け璐?')
+    }
+  }
+
+  async function createNewWorkspace() {
+    setWorkspaceState('姝ｅ湪鍒涘缓宸ヤ綔鍖?')
+    try {
+      const created = await createWorkspace<WorkspaceSummary>({
+        name: newWorkspaceName,
+        plan: 'creator',
+      })
+      setActiveWorkspaceId(created.id)
+      window.localStorage.setItem(WORKSPACE_STORAGE_KEY, created.id)
+      setWorkspaceState('宸插垏鎹㈠埌鏂板伐浣滃尯')
+    } catch {
+      setWorkspaceState('鍒涘缓澶辫触锛氳妫€鏌?API')
+    }
+  }
+
+  async function requestLoginCode() {
+    setAuthState('姝ｅ湪鍙戦€侀獙璇佺爜')
+    try {
+      const result = await requestEmailLoginCode({
+        email: loginEmail,
+        displayName: loginName,
+      })
+      setAuthState(
+        result.debugCode
+          ? `Code generated: ${result.debugCode}`
+          : `楠岃瘉鐮佸凡鍙戦€佽嚦 ${result.email}`,
+      )
+    } catch {
+      setAuthState('楠岃瘉鐮佸彂閫佸け璐ワ細璇锋鏌ラ偖绠辨垨閭欢鏈嶅姟')
+    }
+  }
+
+  async function verifyLoginCode() {
+    setAuthState('姝ｅ湪楠岃瘉楠岃瘉鐮?')
+    try {
+      const nextSession = await verifyEmailLoginCode<WorkspaceSession>({
+        email: loginEmail,
+        code: loginCode,
+        displayName: loginName,
+        workspaceId: activeWorkspaceId,
+      })
+      setSession(nextSession)
+      setActiveWorkspaceId(nextSession.workspace.id)
+      window.localStorage.setItem(WORKSPACE_STORAGE_KEY, nextSession.workspace.id)
+      setAuthState(`宸茬櫥褰曪細${nextSession.user.email}`)
+      setLoginCode('')
+      await refreshTeamState(nextSession.workspace.id)
+    } catch {
+      setAuthState('楠岃瘉鐮侀獙璇佸け璐ワ細璇锋鏌?6 浣嶉獙璇佺爜')
+    }
+  }
+
+  async function loginToWorkspace() {
+    setAuthState('姝ｅ湪鐧诲綍')
+    try {
+      if (isNetlifyIdentityAuth) {
+        await netlifyIdentityLogin(loginEmail, loginPassword)
+        const nextSession = await syncIdentitySession(activeWorkspaceId)
+        setAuthState(`宸茬櫥褰曪細${nextSession.user.email}`)
+        return
+      }
+      if (isEmailCodeAuth) {
+        await verifyLoginCode()
+        return
+      }
+      if (isGenericProviderAuth) {
+        setAuthState('璇烽€氳繃姝ｅ紡鐧诲綍鍏ュ彛杩涘叆锛孉PI 灏嗕粠鍙椾俊韬唤澶村悓姝ヤ細璇?')
+        return
+      }
+
+      const nextSession = await localApiLogin<WorkspaceSession>({
+        email: loginEmail,
+        displayName: loginName,
+        workspaceId: activeWorkspaceId,
+      })
+      setSession(nextSession)
+      setActiveWorkspaceId(nextSession.workspace.id)
+      window.localStorage.setItem(WORKSPACE_STORAGE_KEY, nextSession.workspace.id)
+      setAuthState(`宸茬櫥褰曪細${nextSession.user.email}`)
+      await refreshTeamState(nextSession.workspace.id)
+    } catch (error) {
+      setAuthState(
+        isNetlifyIdentityAuth ? formatIdentityError(error) : '鐧诲綍澶辫触锛氳妫€鏌ラ偖绠辨垨 API',
+      )
+    }
+  }
+
+  async function signupToWorkspace() {
+    if (isEmailCodeAuth) {
+      await requestLoginCode()
+      return
+    }
+    if (isGenericProviderAuth) {
+      setAuthState('璇峰湪姝ｅ紡璐﹀彿绯荤粺涓垱寤鸿处鍙凤紝鍐嶅洖鍒板伐浣滃彴鍚屾浼氳瘽')
+      return
+    }
+    if (!isNetlifyIdentityAuth) {
+      await loginToWorkspace()
+      return
+    }
+
+    setAuthState('姝ｅ湪鍒涘缓鐪熷疄璐﹀彿')
+    try {
+      const identityUser = await netlifyIdentitySignup(loginEmail, loginPassword, {
+        full_name: loginName,
+      })
+      if (identityUser.confirmedAt) {
+        const nextSession = await syncIdentitySession(activeWorkspaceId)
+        setAuthState(`璐﹀彿宸插垱寤猴細${nextSession.user.email}`)
+      } else {
+        setAuthState('璐﹀彿宸插垱寤猴紝璇峰厛鍒伴偖绠卞畬鎴愮‘璁?')
+      }
+    } catch (error) {
+      setAuthState(formatIdentityError(error))
+    }
+  }
+
+  async function logoutFromWorkspace() {
+    setAuthState('姝ｅ湪閫€鍑?')
+    try {
+      if (isNetlifyIdentityAuth) {
+        await netlifyIdentityLogout()
+        setAuthState('宸查€€鍑虹湡瀹炶处鍙?')
+        return
+      }
+      if (isEmailCodeAuth) {
+        const nextSession = await localApiLogout<WorkspaceSession>()
+        setSession(nextSession)
+        setActiveWorkspaceId(nextSession.workspace.id)
+        window.localStorage.setItem(WORKSPACE_STORAGE_KEY, nextSession.workspace.id)
+        setAuthState('宸查€€鍑洪偖绠遍獙璇佺爜璐﹀彿')
+        return
+      }
+      if (isGenericProviderAuth) {
+        setAuthState('璇峰湪姝ｅ紡璐﹀彿绯荤粺涓€€鍑虹櫥褰?')
+        return
+      }
+
+      const nextSession = await localApiLogout<WorkspaceSession>()
+      setSession(nextSession)
+      setActiveWorkspaceId(nextSession.workspace.id)
+      window.localStorage.setItem(WORKSPACE_STORAGE_KEY, nextSession.workspace.id)
+      setAuthState('宸查€€鍑哄埌榛樿璐﹀彿')
+      await refreshTeamState(nextSession.workspace.id)
+    } catch {
+      setAuthState('閫€鍑哄け璐ワ細璇锋鏌?API')
+    }
+  }
+
+  function switchWorkspace(workspaceId: string) {
+    setActiveWorkspaceId(workspaceId)
+    window.localStorage.setItem(WORKSPACE_STORAGE_KEY, workspaceId)
+    setWorkspaceState('姝ｅ湪鍒囨崲宸ヤ綔鍖?')
+  }
+
+  function switchProject(projectId: string) {
+    const nextProject = projectList.find((item) => item.id === projectId)
+    if (!nextProject) return
+    applyProject(nextProject, `宸插垏鎹㈠埌 ${nextProject.title}`)
+    setSaveState('宸插垏鎹綔鍝?')
+    setBuildState('灏氭湭鐢熸垚鍙戝竷鍖?')
+    setPublishedBuildId('')
+    setPaymentOrders([])
+    setPendingPaidChoice(null)
+  }
+
+  async function createNewProject() {
+    const nextProject: StoryProject = {
+      ...sampleProject,
+      id: `playdrama-project-${Date.now()}`,
+      title: '鏂扮殑浜掑姩鐭墽',
+      lifecycleStatus: 'active',
+      archivedAt: null,
+      updatedAt: new Date().toISOString(),
+    }
+    applyProject(nextProject, '宸插垱寤烘柊浣滃搧鑽夌')
+    setProjectList((current) => [nextProject, ...current])
+    setSaveState('鏂颁綔鍝佽崏绋垮緟淇濆瓨')
+    setProjectListState('鏂颁綔鍝佸凡鍔犲叆鍒楄〃')
+    await syncProjectToApi(nextProject)
+  }
+
+  async function duplicateProject(projectId: string) {
+    const sourceProject = projectList.find((item) => item.id === projectId)
+    if (!sourceProject) return
+
+    const nextProject: StoryProject = {
+      ...sourceProject,
+      id: `playdrama-copy-${Date.now()}`,
+      title: `${sourceProject.title} 鍓湰`,
+      lifecycleStatus: 'active',
+      archivedAt: null,
+      updatedAt: new Date().toISOString(),
+    }
+
+    applyProject(nextProject, '宸插鍒朵綔鍝?')
+    setProjectList((current) => [nextProject, ...current])
+    setProjectListState('浣滃搧鍓湰宸插垱寤?')
+    await syncProjectToApi(nextProject)
+  }
+
+  async function archiveProject(projectId: string) {
+    const sourceProject = projectList.find((item) => item.id === projectId)
+    if (!sourceProject) return
+
+    const archivedAt = new Date().toISOString()
+    try {
+      await updateRemoteProject<StoryProject>(projectId, {
+        lifecycleStatus: 'archived',
+        archivedAt,
+      })
+      const nextList = projectList.filter((item) => item.id !== projectId)
+      setProjectList(nextList)
+      setArchivedProjectList((current) => [
+        {
+          ...sourceProject,
+          lifecycleStatus: 'archived',
+          archivedAt,
+        },
+        ...current,
+      ])
+      setProjectListState('浣滃搧宸插綊妗?')
+
+      if (project.id === projectId) {
+        const fallbackProject = nextList[0] || {
+          ...sampleProject,
+          id: `playdrama-project-${Date.now()}`,
+          title: '鏂扮殑浜掑姩鐭墽',
+          lifecycleStatus: 'active',
+          archivedAt: null,
+          updatedAt: new Date().toISOString(),
+        }
+        applyProject(fallbackProject, '褰撳墠浣滃搧宸插綊妗?')
+        setSaveState(nextList[0] ? '宸插垏鎹㈠埌涓嬩竴涓綔鍝?' : '褰撳墠宸ヤ綔鍖烘殏鏃犳椿璺冧綔鍝?')
+      }
+
+      await refreshTeamState(activeWorkspaceId)
+    } catch {
+      setProjectListState('褰掓。澶辫触锛氳妫€鏌?API')
+    }
+  }
+
+  async function restoreProject(projectId: string) {
+    const sourceProject = archivedProjectList.find((item) => item.id === projectId)
+    if (!sourceProject) return
+
+    try {
+      const restoredProject = normalizeProject(
+        await updateRemoteProject<StoryProject>(projectId, {
+          lifecycleStatus: 'active',
+          archivedAt: null,
+        }),
+      )
+      setArchivedProjectList((current) => current.filter((item) => item.id !== projectId))
+      setProjectList((current) => [restoredProject, ...current])
+      applyProject(restoredProject, '宸叉仮澶嶅綊妗ｄ綔鍝?')
+      setProjectListState('褰掓。浣滃搧宸叉仮澶?')
+      setSaveState('宸叉仮澶嶄綔鍝?')
+      await refreshTeamState(activeWorkspaceId)
+    } catch {
+      setProjectListState('鎭㈠澶辫触锛氳妫€鏌?API')
+    }
+  }
+
+  const player = (
+    <section className={`panel preview-panel ${previewOnly ? 'published-player-panel' : ''}`}>
+      <div className="panel-header">
+        <div>
+          <p className="eyebrow">Playable Runtime</p>
+          <h2>{previewOnly ? '浜掑姩鐭墽' : '鍙帺棰勮'}</h2>
+        </div>
+        <span className="runtime-progress-pill">
+          {runtimeProgress.current}/{runtimeProgress.total}
+        </span>
+        <button
+          className="icon-button"
+          type="button"
+          aria-label="Restart preview"
+          onClick={() => restartRuntime()}
+        >
+          <RotateCcw size={17} />
+        </button>
+      </div>
+      <div className="runtime-meta-strip">
+        <span>{runtimeNode.kind}</span>
+        <span>{runtimeAllowedChoiceCount} 涓彲閫夊垎鏀?</span>
+        <span>{runtimeProgress.percent}% 鍓ф儏杩涘害</span>
+        <span>{project.publish.monetization === 'Paid Ending' ? checkoutState : '鍏嶈垂浣撻獙'}</span>
+      </div>
+      <div className="runtime-state">
+        {project.variables.map((variable) => (
+          <label key={variable.id}>
+            <span>{variable.label}</span>
+            <input
+              value={runtimeState[variable.label] ?? variable.defaultValue}
+              onChange={(event) =>
+                updateRuntimeValue(variable.label, event.target.value)
+              }
+            />
+          </label>
+        ))}
+      </div>
+      <div className="phone-frame">
+        <div className="video-scene">
+          <div className="scene-topbar">
+            <span>{runtimeNode.id}</span>
+            <span>{runtimeNode.kind}</span>
+          </div>
+          <div className="scene-progress">
+            <span style={{ width: `${runtimeProgress.percent}%` }} />
+          </div>
+          <div className="scene-copy">
+            <strong>{runtimeNode.title}</strong>
+            <p>{runtimeNode.summary}</p>
+          </div>
+        </div>
+        {runtimeNode.choices.map((item) => {
+          const allowed = evaluateCondition(item.condition, runtimeState)
+          const requiresPayment = choiceRequiresPayment(item)
+          return (
+            <button
+              className={`choice-button ${allowed && !requiresPayment ? '' : 'locked'}`}
+              type="button"
+              key={item.id}
+              onClick={() => playChoice(item)}
+            >
+              {item.label}
+              <span>
+                {requiresPayment
+                  ? `浠樿垂瑙ｉ攣 路 ${project.publish.price} 鍏僠`
+                  : item.condition
+                  ? `${allowed ? '婊¤冻' : '閿佸畾'} 路 ${item.condition}`
+                  : `杩涘叆 ${item.targetNodeId}`}
+              </span>
+            </button>
+          )
+        })}
+        {pendingPaidChoice && (
+          <div className="checkout-panel">
+            <div>
+              <strong>瑙ｉ攣浠樿垂缁撳眬</strong>
+              <span>{project.publish.monetization} 路 {project.publish.price} 鍏?</span>
+            </div>
+            <button className="play-button" type="button" onClick={unlockPaidEnding}>
+              <ShieldCheck size={17} />
+              娌欑洅鏀粯
+            </button>
+          </div>
+        )}
+        {runtimeNode.kind === 'Ending' && (
+          <button className="play-button" type="button" onClick={() => restartRuntime()}>
+            <Play size={17} fill="currentColor" />
+            閲嶆柊寮€濮?          </button>
+        )}
+      </div>
+      <div className="runtime-path">
+        <span>宸茶蛋璺緞</span>
+        <strong>{runtimePathLabel}</strong>
+      </div>
+      <p className="runtime-message">{runtimeMessage}</p>
+    </section>
+  )
+
+  if (previewOnly) {
+    return (
+      <main className="share-preview-shell">
+        <header className="share-preview-header">
+          <div>
+            <p className="eyebrow">Local Share Preview</p>
+            <h1>{project.title}</h1>
+            <span>{project.publish.category} 路 {project.publish.monetization}</span>
+          </div>
+          <div className="share-preview-actions">
+            <span>{publishedBuildId ? `build #${publishedBuildId.slice(-6)}` : 'local draft'}</span>
+            <button className="ghost-button" type="button" onClick={exitSharePreview}>
+              杩斿洖鍒涗綔鍙?            </button>
+          </div>
+        </header>
+        <div className="share-preview-body">{player}</div>
+      </main>
+    )
+  }
+
+  return (
+    <main className="app-shell">
+      <input
+        ref={fileInputRef}
+        className="file-input"
+        type="file"
+        accept="application/json,.json"
+        onChange={importProject}
+      />
+
+      <aside className="sidebar" aria-label="Workspace">
+        <div className="brand">
+          <div className="brand-mark">
+            <Sparkles size={20} />
+          </div>
+          <div>
+            <strong>PlayDrama</strong>
+            <span>AI 浜掑姩鐭墽宸ヤ綔鍙?</span>
+          </div>
+        </div>
+
+        <nav className="nav-list" aria-label="Main">
+          <button className="nav-item active" type="button">
+            <Layers3 size={18} />
+            椤圭洰鎬昏
+          </button>
+          <button className="nav-item" type="button">
+            <GitBranch size={18} />
+            鍓ф儏缂栬緫
+          </button>
+          <button className="nav-item" type="button">
+            <Users size={18} />
+            瑙掕壊璧勪骇
+          </button>
+          <button className="nav-item" type="button">
+            <Bot size={18} />
+            AI 瀵兼紨
+          </button>
+          <button className="nav-item" type="button">
+            <Share2 size={18} />
+            鍙戝竷鍙樼幇
+          </button>
+        </nav>
+
+        <section className="side-section">
+          <div className="section-title">
+            <span>褰撳墠妯℃澘</span>
+            <button className="icon-button" type="button" aria-label="Add template">
+              <Plus size={16} />
+            </button>
+          </div>
+          <div className="template-tile">
+            <FileText size={18} />
+            <div>
+              <strong>{project.template}</strong>
+              <span>绾跨储銆佸瘑鐮侀攣銆侀殣钘忕粨灞€</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="side-section">
+          <div className="section-title">
+            <span>宸ヤ綔鍖烘潈闄?</span>
+          </div>
+          <div className="auth-panel">
+            <input
+              value={loginEmail}
+              onChange={(event) => setLoginEmail(event.target.value)}
+              placeholder="鐧诲綍閭"
+            />
+            <input
+              value={loginName}
+              onChange={(event) => setLoginName(event.target.value)}
+              placeholder="鏄剧ず鍚嶇О"
+            />
+            {isNetlifyIdentityAuth && (
+              <input
+                value={loginPassword}
+                onChange={(event) => setLoginPassword(event.target.value)}
+                placeholder="鐧诲綍瀵嗙爜"
+                type="password"
+              />
+            )}
+            {isEmailCodeAuth && (
+              <input
+                value={loginCode}
+                onChange={(event) => setLoginCode(event.target.value)}
+                placeholder="6 浣嶉獙璇佺爜"
+                inputMode="numeric"
+                maxLength={6}
+              />
+            )}
+            <div className="auth-actions">
+              <button className="ghost-button compact" type="button" onClick={loginToWorkspace}>
+                {isGenericProviderAuth ? '鍚屾' : isEmailCodeAuth ? '验证登录' : '鐧诲綍'}
+              </button>
+              {(isNetlifyIdentityAuth || isGenericProviderAuth || isEmailCodeAuth) && (
+                <button className="ghost-button compact" type="button" onClick={signupToWorkspace}>
+                  {isEmailCodeAuth ? '发送验证码' : '娉ㄥ唽'}
+                </button>
+              )}
+              <button className="ghost-button compact" type="button" onClick={logoutFromWorkspace}>
+                閫€鍑?              </button>
+            </div>
+            <div className="auth-provider-badge">
+              <span>璁よ瘉妯″紡</span>
+              <strong>{authProvider?.provider || 'local-demo'}</strong>
+              <small>
+                {authProvider?.productionReady ? '鐢熶骇鍙敤' : '鏈湴婕旂ず'} 路{' '}
+                {authProvider?.requestScoped ? '璇锋眰绾т細璇?' : '澶栭儴浼氳瘽'}
+              </small>
+            </div>
+            <span className="workspace-state">{authState}</span>
+          </div>
+          <div className="storage-status-card">
+            <strong>
+              鏁版嵁搴?路 {storageHealth?.driver || 'json'} 路{' '}
+              {storageHealth?.productionReady ? 'Cloud ready' : 'Local / pending'}
+            </strong>
+            {(storageHealth?.missing || []).slice(0, 3).map((item) => (
+              <div className="storage-status-row" key={item.id}>
+                <span>{item.label}</span>
+                <em>{item.action}</em>
+              </div>
+            ))}
+          </div>
+          <div className="commercial-readiness-card">
+            <strong>
+              鍟嗙敤浣撴 路{' '}
+              {commercialReadiness?.status === 'pass' ? 'Ready' : 'Pending'}
+            </strong>
+            <span>
+              {commercialReadiness
+                ? `${commercialReadiness.passed}/${commercialReadiness.total} 椤归€氳繃`
+                : '绛夊緟 API 鍚屾'}
+            </span>
+            {(commercialReadiness?.missing || []).slice(0, 4).map((item) => (
+              <div className="commercial-readiness-row" key={item.id}>
+                <span>
+                  {item.area} 路 {item.label}
+                </span>
+                <em>{item.missingFields.slice(0, 3).join(', ') || item.action}</em>
+              </div>
+            ))}
+          </div>
+          <label className="workspace-switcher">
+            <span>褰撳墠宸ヤ綔鍖?</span>
+            <select
+              value={activeWorkspaceId}
+              onChange={(event) => switchWorkspace(event.target.value)}
+            >
+              {workspaceList.length === 0 && (
+                <option value={activeWorkspaceId}>Creator Studio</option>
+              )}
+              {workspaceList.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="workspace-card">
+            <span className="avatar-badge">
+              {session?.user.avatarInitials || 'AI'}
+            </span>
+            <div>
+              <strong>{session?.workspace.name || 'Creator Studio'}</strong>
+              <span>
+                {session?.user.displayName || 'Creator'} 路{' '}
+                {session?.membership.role || 'owner'}
+              </span>
+            </div>
+          </div>
+          <div className="permission-list">
+            {(session?.membership.permissions || ['project:read']).map((item) => (
+              <span key={item}>{item}</span>
+            ))}
+          </div>
+          <div className="workspace-create">
+            <input
+              value={newWorkspaceName}
+              onChange={(event) => setNewWorkspaceName(event.target.value)}
+            />
+            <button className="ghost-button compact" type="button" onClick={createNewWorkspace}>
+              <Plus size={16} />
+              鏂板缓
+            </button>
+          </div>
+          <span className="workspace-state">{workspaceState}</span>
+        </section>
+      </aside>
+
+      <section className="workspace">
+        <header className="topbar">
+          <div>
+            <p className="eyebrow">MVP Prototype</p>
+            <input
+              className="project-title-input"
+              value={project.title}
+              onChange={(event) =>
+                updateProject((current) => ({
+                  ...current,
+                  title: event.target.value,
+                }))
+              }
+            />
+          </div>
+          <div className="topbar-actions">
+            <label className="search">
+              <Search size={17} />
+              <input
+                placeholder="Search nodes, roles, variables"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+              />
+            </label>
+            <span className="save-state">{saveState}</span>
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload size={17} />
+              瀵煎叆
+            </button>
+            <button className="ghost-button" type="button" onClick={exportProject}>
+              <Download size={17} />
+              瀵煎嚭
+            </button>
+            <button className="ghost-button" type="button" onClick={resetSampleProject}>
+              <RotateCcw size={17} />
+              閲嶇疆
+            </button>
+            <button className="ghost-button" type="button" onClick={openSharePreview}>
+              <Share2 size={17} />
+              棰勮閾炬帴
+            </button>
+            <button className="primary-button" type="button" onClick={saveProject}>
+              <Save size={17} />
+              淇濆瓨
+            </button>
+          </div>
+        </header>
+
+        <section className="command-deck" aria-label="Studio command deck">
+        <section className="launch-hero" aria-label="Commercial launch status">
+          <div className="launch-hero-copy">
+            <div className="hero-kicker">
+              <Rocket size={16} />
+              <span>Commercial Launch Workspace</span>
+            </div>
+            <h1>浠庝簰鍔ㄧ煭鍓у垱浣滐紝鍒颁笂绾块獙鏀跺拰鍥㈤槦杩愯惀</h1>
+            <p>
+              {project.publish.category} 路 {project.publish.monetization} 路{' '}
+              {commercialStatusLabel}
+            </p>
+            <div className="hero-stat-row" aria-label="Launch summary">
+              {launchHeroStats.map((item) => (
+                <span key={item.label}>
+                  <strong>{item.value}</strong>
+                  <em>{item.label}</em>
+                </span>
+              ))}
+            </div>
+            <div className="hero-actions">
+              <button className="primary-button" type="button" onClick={saveProject}>
+                <Save size={17} />
+                淇濆瓨褰撳墠鐗堟湰
+              </button>
+              <button className="ghost-button on-dark" type="button" onClick={openSharePreview}>
+                <Play size={17} fill="currentColor" />
+                鎵撳紑棰勮
+              </button>
+            </div>
+          </div>
+
+          <div className="launch-console" aria-label="Launch pipeline">
+            <div className="console-header">
+              <span>
+                <TerminalSquare size={15} />
+                launch gate
+              </span>
+              <strong>{commercialProgress}</strong>
+            </div>
+            <div className="console-body">
+              {launchSignals.map((item) => (
+                <div className="console-row" key={item.label}>
+                  <span className={item.ok ? 'status-dot ok' : 'status-dot'} />
+                  <span>{item.label}</span>
+                  <strong>{item.value}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="pipeline-strip" aria-label="Production pipeline">
+          {launchPipeline.map((item) => (
+            <article className="pipeline-item" key={item.label}>
+              <span className={item.ok ? 'pipeline-icon ok' : 'pipeline-icon'}>
+                {item.ok ? <CheckCircle2 size={16} /> : <ShieldCheck size={16} />}
+              </span>
+              <div>
+                <strong>{item.label}</strong>
+                <em>{item.value}</em>
+              </div>
+            </article>
+          ))}
+        </section>
+
+        <section className="metric-grid" aria-label="Project metrics">
+          {metrics.map((metric) => {
+            const Icon = metric.icon
+            return (
+              <article className="metric-card" key={metric.label}>
+                <Icon size={18} />
+                <span>{metric.label}</span>
+                <strong>{metric.value}</strong>
+              </article>
+            )
+          })}
+        </section>
+
+        </section>
+
+        <section className="panel project-switch-panel">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Workspace Projects</p>
+              <h2>宸ヤ綔鍖轰綔鍝?</h2>
+            </div>
+            <div className="panel-actions">
+              <span className="project-list-state">{projectListState}</span>
+              <button
+                className="ghost-button compact"
+                type="button"
+                onClick={() => setShowArchivedProjects((current) => !current)}
+              >
+                {showArchivedProjects ? '闅愯棌褰掓。' : `褰掓。 ${archivedProjectList.length}`}
+              </button>
+              <button className="primary-button compact" type="button" onClick={createNewProject}>
+                <Plus size={16} />
+                鏂板缓浣滃搧
+              </button>
+            </div>
+          </div>
+          <div className="project-switch-list">
+            {projectList.length === 0 && (
+              <article className="project-switch-empty">
+                <strong>褰撳墠宸ヤ綔鍖鸿繕娌℃湁淇濆瓨浣滃搧</strong>
+                <span>鐐瑰嚮淇濆瓨鎴栨柊寤轰綔鍝佸悗锛屼細鍑虹幇鍦ㄨ繖閲屻€?</span>
+              </article>
+            )}
+            {projectList.map((item) => (
+              <article
+                className={`project-switch-item ${item.id === project.id ? 'active' : ''}`}
+                key={item.id}
+              >
+                <button type="button" onClick={() => switchProject(item.id)}>
+                  <strong>{item.title}</strong>
+                  <span>{item.publish.category} 路 {item.publish.status}</span>
+                  <em>{item.nodes.length} 鑺傜偣</em>
+                </button>
+                <div className="project-card-actions">
+                  <button type="button" onClick={() => duplicateProject(item.id)}>
+                    澶嶅埗
+                  </button>
+                  <button type="button" onClick={() => archiveProject(item.id)}>
+                    褰掓。
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+          {showArchivedProjects && (
+            <div className="archived-projects">
+              <div className="section-title light">
+                <span>褰掓。浣滃搧</span>
+              </div>
+              {archivedProjectList.length === 0 && (
+                <article className="project-switch-empty">
+                  <strong>鏆傛棤褰掓。浣滃搧</strong>
+                  <span>褰掓。鍚庣殑浣滃搧浼氫繚鐣欏湪杩欓噷锛屽彲闅忔椂鎭㈠銆?</span>
+                </article>
+              )}
+              {archivedProjectList.map((item) => (
+                <article className="project-switch-item archived" key={item.id}>
+                  <button type="button" onClick={() => restoreProject(item.id)}>
+                    <strong>{item.title}</strong>
+                    <span>{item.publish.category} 路 宸插綊妗?</span>
+                    <em>{item.nodes.length} 鑺傜偣</em>
+                  </button>
+                  <div className="project-card-actions">
+                    <button type="button" onClick={() => restoreProject(item.id)}>
+                      鎭㈠
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <div className="content-grid">
+          <section className="panel story-panel">
+            <div className="panel-header">
+              <div>
+                <p className="eyebrow">Story Graph</p>
+                <h2>鍓ф儏鍥捐氨</h2>
+              </div>
+              <div className="panel-actions">
+                <button className="ghost-button compact" type="button" onClick={addStoryNode}>
+                  <Plus size={16} />
+                  娣诲姞鑺傜偣
+                </button>
+                <button
+                  className="primary-button compact"
+                  type="button"
+                  onClick={generateNextScene}
+                  disabled={aiState === '姝ｅ湪鐢熸垚涓嬩竴骞?..'}
+                >
+                  <Wand2 size={16} />
+                  {aiState.includes('generating') ? 'Generating..' : 'Generate next scene'}
+                </button>
+              </div>
+            </div>
+            <p className="ai-generation-status">{aiState}</p>
+
+            <div className="graph-canvas" aria-label="Story graph canvas">
+              {storyNodes.map((node) => (
+                <button
+                  className={`graph-node ${node.id === selectedNodeId ? 'selected' : ''}`}
+                  key={node.id}
+                  type="button"
+                  onClick={() => setSelectedNodeId(node.id)}
+                >
+                  <span>{node.id}</span>
+                  <strong>{node.title}</strong>
+                  <em>{node.kind}</em>
+                  <small>
+                    {node.choices.length > 0
+                      ? node.choices.map((item) => item.targetNodeId).join(' / ')
+                      : 'No next node'}
+                  </small>
+                </button>
+              ))}
+            </div>
+
+            <div className="node-list">
+              {filteredNodes.map((node, index) => (
+                <button
+                  className={`story-node ${node.id === selectedNodeId ? 'selected' : ''}`}
+                  key={node.id}
+                  type="button"
+                  onClick={() => setSelectedNodeId(node.id)}
+                >
+                  <span className="node-index">{index + 1}</span>
+                  <span className="node-body">
+                    <span className="node-title-row">
+                      <span>{node.id}</span>
+                      <strong>{node.title}</strong>
+                      <em>{node.kind}</em>
+                    </span>
+                    <span className="node-summary">{node.summary}</span>
+                  </span>
+                  <span className="node-metric">{node.metric}</span>
+                  <ChevronRight size={18} />
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <aside className="right-column">
+            <section className="panel editor-panel compliance-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">Model Routing</p>
+                  <h2>妯″瀷鍚堣璺敱</h2>
+                </div>
+              </div>
+              <div className="compliance-note">
+                鍥藉唴鍏紑鍟嗙敤榛樿浣跨敤鍥藉唴澶фā鍨嬶紱OpenAI/GPT 浠呯敤浜庢捣澶栫増鎴栫爺绌剁幆澧冦€?              </div>
+              <div className="publish-grid">
+                <label>
+                  <span>鐩爣甯傚満</span>
+                  <select
+                    value={project.modelRouting.market}
+                    onChange={(event) => updateModelRouting('market', event.target.value)}
+                  >
+                    <option>China Mainland</option>
+                    <option>Global</option>
+                  </select>
+                </label>
+                <label>
+                  <span>OpenAI 绛栫暐</span>
+                  <select
+                    value={project.modelRouting.openaiPolicy}
+                    onChange={(event) => updateModelRouting('openaiPolicy', event.target.value)}
+                  >
+                    <option>Disabled for China public launch</option>
+                    <option>Global only</option>
+                    <option>Research only</option>
+                  </select>
+                </label>
+                <label className="wide-field">
+                  <span>榛樿鍥藉唴妯″瀷</span>
+                  <input
+                    value={project.modelRouting.defaultProvider}
+                    onChange={(event) =>
+                      updateModelRouting('defaultProvider', event.target.value)
+                    }
+                  />
+                </label>
+                <label className="wide-field">
+                  <span>澶囩敤妯″瀷</span>
+                  <input
+                    value={project.modelRouting.fallbackProvider}
+                    onChange={(event) =>
+                      updateModelRouting('fallbackProvider', event.target.value)
+                    }
+                  />
+                </label>
+              </div>
+            </section>
+
+            <section className="panel editor-panel ai-cost-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">AI Ledger</p>
+                  <h2>妯″瀷鎴愭湰</h2>
+                </div>
+                <span className="project-list-state">
+                  {aiUsageSummary.calls} 娆¤皟鐢?                </span>
+              </div>
+              <div className="ai-cost-grid">
+                <article>
+                  <strong>{aiUsageSummary.totalTokens}</strong>
+                  <span>tokens</span>
+                </article>
+                <article>
+                  <strong>
+                    {aiUsageSummary.currency} {aiUsageSummary.totalCost.toFixed(6)}
+                  </strong>
+                  <span>浼扮畻鎴愭湰</span>
+                </article>
+              </div>
+              <div className="ai-cost-list">
+                {aiUsageSummary.latest.length === 0 && (
+                  <span>鐢熸垚涓嬩竴骞曞悗浼氳褰曟ā鍨嬨€乼oken銆佹垚鏈拰鑰楁椂銆?</span>
+                )}
+                {aiUsageSummary.latest.map((event) => (
+                  <article className="ai-cost-row" key={event.id}>
+                    <div>
+                      <strong>{event.task}</strong>
+                      <span>{event.providerId} 路 {event.model}</span>
+                    </div>
+                    <em>
+                      {event.totalTokens} tokens 路 {event.currency} {event.estimatedCost} 路 {event.latencyMs}ms
+                    </em>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className="panel editor-panel analytics-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">Analytics</p>
+                  <h2>鎾斁鏁版嵁</h2>
+                </div>
+                <span className="project-list-state">
+                  {publishedBuildId ? `build #${publishedBuildId.slice(-6)}` : 'Waiting for build'}
+                </span>
+              </div>
+              <div className="analytics-grid">
+                <article>
+                  <strong>{analyticsSummary.sessions}</strong>
+                  <span>浼氳瘽</span>
+                </article>
+                <article>
+                  <strong>{analyticsSummary.nodeViews}</strong>
+                  <span>鑺傜偣娴忚</span>
+                </article>
+                <article>
+                  <strong>{analyticsSummary.choices}</strong>
+                  <span>閫夋嫨鐐瑰嚮</span>
+                </article>
+                <article>
+                  <strong>{analyticsSummary.endings}</strong>
+                  <span>缁撳眬鍒拌揪</span>
+                </article>
+              </div>
+              <div className="analytics-list">
+                {analyticsSummary.recent.length === 0 && (
+                  <span>鍙戝竷鍚庢墦寮€棰勮鎴栫偣鍑婚€夐」锛岃繖閲屼細鍑虹幇浜嬩欢銆?</span>
+                )}
+                {analyticsSummary.recent.map((event) => (
+                  <article className="analytics-row" key={event.id}>
+                    <strong>{event.eventName}</strong>
+                    <span>
+                      {event.nodeId || 'project'} 路 {event.choiceId || event.buildId.slice(-6)}
+                    </span>
+                    <em>{new Date(event.createdAt).toLocaleString()}</em>
+                  </article>
+                ))}
+              </div>
+              <div className="analytics-breakdown">
+                <div>
+                  <strong>鑺傜偣鐑害</strong>
+                  {analyticsDetail.nodeRows.length === 0 && <span>鏆傛棤鑺傜偣娴忚</span>}
+                  {analyticsDetail.nodeRows.map((row) => (
+                    <article className="analytics-mini-row" key={row.id}>
+                      <span>{row.id} 路 {row.title}</span>
+                      <em>{row.views} 娴忚 / {row.choices} 閫夋嫨</em>
+                    </article>
+                  ))}
+                </div>
+                <div>
+                  <strong>褰撳墠鑺傜偣閫夋嫨</strong>
+                  {analyticsDetail.choiceRows.length === 0 && <span>鏆傛棤鍙€夊垎鏀?</span>}
+                  {analyticsDetail.choiceRows.map((row) => (
+                    <article className="analytics-mini-row" key={row.id}>
+                      <span>{row.label}</span>
+                      <em>{row.count} 娆?</em>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            <section className="panel editor-panel safety-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">Safety Gate</p>
+                  <h2>鍐呭瀹夊叏</h2>
+                </div>
+                <span className={`safety-badge ${latestContentSafetyReview?.status || 'pending'}`}>
+                  {contentSafetySummary.statusLabel}
+                </span>
+              </div>
+              <div className="safety-summary">
+                <article>
+                  <strong>{latestContentSafetyReview?.flagCount ?? 0}</strong>
+                  <span>椋庨櫓鎻愮ず</span>
+                </article>
+                <article>
+                  <strong>{latestContentSafetyReview?.blockingCount ?? 0}</strong>
+                  <span>闃绘柇椤?</span>
+                </article>
+                <article>
+                  <strong>{latestContentSafetyReview?.summary?.scannedFields ?? 0}</strong>
+                  <span>鎵弿瀛楁</span>
+                </article>
+              </div>
+              <div className="safety-actions">
+                <button
+                  className="ghost-button compact"
+                  type="button"
+                  onClick={() => void scanContentSafety(project)}
+                  disabled={contentSafetyState === '姝ｅ湪鎵弿鍐呭瀹夊叏'}
+                >
+                  <ShieldCheck size={16} />
+                  閲嶆柊鎵弿
+                </button>
+                <span>{contentSafetyState}</span>
+              </div>
+              <div className="safety-list">
+                {contentSafetySummary.flags.length === 0 && (
+                  <span>鍙戝竷鍓嶄細鑷姩鎵弿鏍囬銆佽妭鐐广€侀€夐」銆佽鑹插拰鍙橀噺鏂囨湰銆?</span>
+                )}
+                {contentSafetySummary.flags.slice(0, 4).map((flag) => (
+                  <article className="safety-row" key={flag.id}>
+                    <div>
+                      <strong>{flag.category}</strong>
+                      <span>{flag.path}</span>
+                    </div>
+                    <em>{flag.severity} 路 {flag.action}</em>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className="panel editor-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">Publish</p>
+                  <h2>鍙戝竷璁剧疆</h2>
+                </div>
+                <div className="panel-actions">
+                  <button
+                    className="ghost-button compact"
+                    type="button"
+                    onClick={publishBuild}
+                    disabled={buildState === 'Generating build'}
+                  >
+                    <Layers3 size={16} />
+                    Generate build
+                  </button>
+                  <button className="icon-button" type="button" onClick={openSharePreview} aria-label="Open preview link">
+                    <Share2 size={16} />
+                  </button>
+                </div>
+              </div>
+              <div className="api-status">{buildState}</div>
+              <div className="build-history">
+                <div className="build-history-header">
+                  <strong>鍙戝竷鐗堟湰</strong>
+                  <span>{publishBuilds.length} 涓揩鐓?</span>
+                </div>
+                {publishBuilds.length === 0 && (
+                  <span className="build-history-empty">鐢熸垚鍙戝竷鍖呭悗浼氫繚鐣欏彲棰勮銆佸彲鍥炶浇鐨勭増鏈€?</span>
+                )}
+                {publishBuilds.slice(0, 4).map((build) => (
+                  <article className="build-history-row" key={build.id}>
+                    <div>
+                      <strong>v{build.version}</strong>
+                      <span>{build.status} 路 {build.visibility || project.publish.visibility}</span>
+                    </div>
+                    <em>{new Date(build.createdAt).toLocaleString()}</em>
+                    <div className="build-history-actions">
+                      <button
+                        className="ghost-button compact"
+                        type="button"
+                        onClick={() => openPublishedBuildPreview(build.id)}
+                      >
+                        棰勮
+                      </button>
+                      <button
+                        className="ghost-button compact"
+                        type="button"
+                        onClick={() => restoreBuildSnapshot(build)}
+                        disabled={!build.snapshot}
+                      >
+                        杞藉叆蹇収
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+              <div className="publish-grid">
+                <label>
+                  <span>鐘舵€?</span>
+                  <select
+                    value={project.publish.status}
+                    onChange={(event) => updatePublish('status', event.target.value)}
+                  >
+                    <option>Draft</option>
+                    <option>Beta</option>
+                    <option>Public</option>
+                  </select>
+                </label>
+                <label>
+                  <span>鍙鎬?</span>
+                  <select
+                    value={project.publish.visibility}
+                    onChange={(event) => updatePublish('visibility', event.target.value)}
+                  >
+                    <option>Private</option>
+                    <option>Unlisted</option>
+                    <option>Public</option>
+                  </select>
+                </label>
+                <label className="wide-field">
+                  <span>鍒嗙被</span>
+                  <input
+                    value={project.publish.category}
+                    onChange={(event) => updatePublish('category', event.target.value)}
+                  />
+                </label>
+                <label className="wide-field">
+                  <span>鐩爣鐢ㄦ埛</span>
+                  <input
+                    value={project.publish.audience}
+                    onChange={(event) => updatePublish('audience', event.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>鍙樼幇</span>
+                  <select
+                    value={project.publish.monetization}
+                    onChange={(event) => updatePublish('monetization', event.target.value)}
+                  >
+                    <option>Free</option>
+                    <option>Paid Ending</option>
+                    <option>Paid Chapter</option>
+                  </select>
+                </label>
+                <label>
+                  <span>浠锋牸</span>
+                  <input
+                    value={project.publish.price}
+                    onChange={(event) => updatePublish('price', event.target.value)}
+                  />
+                </label>
+              </div>
+            </section>
+
+            <section className="panel editor-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">Creator Beta</p>
+                  <h2>涓婄嚎妫€鏌?</h2>
+                </div>
+              </div>
+              <div className="onboarding-list">
+                {onboardingItems.map((item) => (
+                  <div className="onboarding-item" key={item.label}>
+                    <span className={item.done ? 'done' : ''}>{item.done ? 'OK' : '-'}</span>
+                    <strong>{item.label}</strong>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="panel editor-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">Team Access</p>
+                  <h2>鍥㈤槦鏉冮檺</h2>
+                </div>
+              </div>
+              <div className="invite-form">
+                <label>
+                  <span>閭€璇烽偖绠?</span>
+                  <input
+                    value={inviteEmail}
+                    onChange={(event) => setInviteEmail(event.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>瑙掕壊</span>
+                  <select
+                    value={inviteRole}
+                    onChange={(event) => setInviteRole(event.target.value)}
+                  >
+                    {roleOptions.map((role) => (
+                      <option key={role.value} value={role.value}>
+                        {role.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  className="primary-button compact"
+                  type="button"
+                  onClick={inviteMember}
+                  disabled={inviteState === 'Inviting'}
+                >
+                  <Users size={16} />
+                  Invite
+                </button>
+                <span>{inviteState}</span>
+                {latestInviteUrl && (
+                  <a className="invite-link" href={latestInviteUrl}>
+                    鏈湴閭€璇烽摼鎺?                  </a>
+                )}
+              </div>
+              <div className="team-list">
+                {members.map((member) => (
+                  <article className="team-row" key={member.id}>
+                    <span className="avatar-badge small">
+                      {member.user?.avatarInitials || 'AI'}
+                    </span>
+                    <div>
+                      <strong>{member.user?.displayName || member.user?.email}</strong>
+                      <span>
+                        {member.role} 路 {member.permissions.length} 椤规潈闄?路{' '}
+                        {member.status || 'active'}
+                        {member.status === 'invited' && member.inviteExpiresAt
+                          ? ` 路 杩囨湡 ${new Date(member.inviteExpiresAt).toLocaleDateString()}`
+                          : ''}
+                      </span>
+                    </div>
+                    {member.status === 'invited' && (
+                      <div className="team-actions">
+                        <button
+                          className="ghost-button compact"
+                          type="button"
+                          onClick={() => resendInvitation(member.id)}
+                        >
+                          閲嶅彂
+                        </button>
+                        <button
+                          className="ghost-button compact danger"
+                          type="button"
+                          onClick={() => cancelInvitation(member.id)}
+                        >
+                          鍙栨秷
+                        </button>
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
+              <div className="delivery-list">
+                <strong>
+                  鏈€杩戦個璇烽偖浠?路 {emailProvider?.provider || 'log'}
+                  {emailProvider?.productionReady ? ' - configured' : ' - local / missing'}
+                </strong>
+                {emailProvider?.provider === 'tencent-ses' && (
+                  <div className="readiness-list">
+                    <strong>
+                      鑵捐浜?SES 路 {emailProvider.tencentSes?.region || 'ap-guangzhou'} 路
+                      {emailProvider.tencentSes?.dryRun
+                        ? ' 骞茶窇婕旂粌'
+                        : emailProvider.tencentSes?.configured
+                          ? ' 鍑瘉宸查厤缃?'
+                          : ' 绛夊緟鍑瘉'}
+                    </strong>
+                    {(emailProvider.tencentSes?.missing || []).slice(0, 3).map((item) => (
+                      <div className="readiness-row" key={item.id}>
+                        <span>{item.label}</span>
+                        <em>{item.action}</em>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {emailProvider?.provider === 'aliyun-directmail' && (
+                  <div className="readiness-list">
+                    <strong>
+                      闃块噷浜戦偖浠舵帹閫?路 {emailProvider.aliyunDirectMail?.region || 'cn-hangzhou'} 路
+                      {emailProvider.aliyunDirectMail?.dryRun
+                        ? ' 骞茶窇婕旂粌'
+                        : emailProvider.aliyunDirectMail?.configured
+                          ? ' 鍑瘉宸查厤缃?'
+                          : ' 绛夊緟鍑瘉'}
+                    </strong>
+                    {(emailProvider.aliyunDirectMail?.missing || []).slice(0, 3).map((item) => (
+                      <div className="readiness-row" key={item.id}>
+                        <span>{item.label}</span>
+                        <em>{item.action}</em>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {inviteDeliveries.length === 0 ? (
+                  <p className="delivery-empty">褰撳墠宸ヤ綔鍖鸿繕娌℃湁閭€璇烽偖浠惰褰?</p>
+                ) : (
+                  inviteDeliveries.slice(0, 4).map((delivery) => (
+                    <div className="delivery-row" key={delivery.id}>
+                      <div>
+                        <span>{delivery.to}</span>
+                        <em>
+                          {delivery.provider} 路 {delivery.status} 路 {delivery.role}
+                          {delivery.errorMessage ? ` 路 ${delivery.errorMessage}` : ''}
+                        </em>
+                      </div>
+                      <div className="delivery-actions">
+                        <button
+                          className="ghost-button compact"
+                          type="button"
+                          onClick={() => markDeliveryStatus(delivery.id, 'sent')}
+                        >
+                          sent
+                        </button>
+                        <button
+                          className="ghost-button compact danger"
+                          type="button"
+                          onClick={() => markDeliveryStatus(delivery.id, 'failed')}
+                        >
+                          failed
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+                <div className="provider-recommendations">
+                  <strong>姝ｅ紡鏈嶅姟鍟嗘帹鑽?</strong>
+                  {(emailProvider?.recommendations || []).slice(0, 4).map((provider) => (
+                    <div className="provider-row" key={provider.id}>
+                      <span>{provider.priority}. {provider.displayName}</span>
+                      <em>
+                        {provider.market} 路 {provider.fit} 路 {provider.callbackMode}
+                      </em>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            <section className="panel editor-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">Audit</p>
+                  <h2>椤圭洰娲诲姩</h2>
+                </div>
+              </div>
+              <div className="audit-filter">
+                <label>
+                  <span>褰撳墠浣滃搧</span>
+                  <strong>{project.title}</strong>
+                </label>
+                <label>
+                  <span>鍔ㄤ綔绛涢€?</span>
+                  <select
+                    value={auditActionFilter}
+                    onChange={(event) => setAuditActionFilter(event.target.value)}
+                  >
+                    {auditActionOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="audit-list activity-list">
+                {projectTimelineEntries.length === 0 && (
+                  <span>褰撳墠浣滃搧鏆傛棤鍖归厤娲诲姩</span>
+                )}
+                {projectTimelineEntries.map((entry) => (
+                  <article className="audit-row" key={entry.id}>
+                    <strong>{entry.action}</strong>
+                    <span>
+                      {entry.targetType} 路 {entry.targetId}
+                    </span>
+                    <em>{new Date(entry.createdAt).toLocaleString()}</em>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className="panel editor-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">Workspace Audit</p>
+                  <h2>鏈€杩戞搷浣?</h2>
+                </div>
+              </div>
+              <div className="audit-list">
+                {recentAuditEntries.length === 0 && <span>鏆傛棤鍚庣鎿嶄綔璁板綍</span>}
+                {recentAuditEntries.map((entry) => (
+                  <article className="audit-row" key={entry.id}>
+                    <strong>{entry.action}</strong>
+                    <span>{entry.targetType} 路 {entry.targetId}</span>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className="panel editor-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">Demo Gallery</p>
+                  <h2>鏍风墖搴撴ā鍨?</h2>
+                </div>
+              </div>
+              <div className="gallery-list">
+                {galleryItems.map((item) => (
+                  <article className="gallery-item" key={item.id}>
+                    <strong>{item.title}</strong>
+                    <span>{item.category}</span>
+                    <em>{item.status} 路 {item.completion}</em>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className="panel editor-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">Variables</p>
+                  <h2>鍙橀噺鏉′欢</h2>
+                </div>
+                <button className="icon-button" type="button" onClick={addVariable} aria-label="Add variable">
+                  <Plus size={16} />
+                </button>
+              </div>
+              <div className="variable-list">
+                {project.variables.map((variable, index) => (
+                  <article className="variable-row" key={`${variable.id}-${index}`}>
+                    <input
+                      value={variable.label}
+                      onChange={(event) => updateVariable(index, 'label', event.target.value)}
+                    />
+                    <select
+                      value={variable.type}
+                      onChange={(event) => updateVariable(index, 'type', event.target.value)}
+                    >
+                      {variableTypes.map((type) => (
+                        <option key={type}>{type}</option>
+                      ))}
+                    </select>
+                    <input
+                      value={variable.defaultValue}
+                      onChange={(event) =>
+                        updateVariable(index, 'defaultValue', event.target.value)
+                      }
+                    />
+                    <button
+                      className="icon-button danger small"
+                      type="button"
+                      aria-label="Remove variable"
+                      onClick={() => removeVariable(index)}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            <section className="panel editor-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">Node Editor</p>
+                  <h2>鑺傜偣缂栬緫</h2>
+                </div>
+                <button
+                  className="icon-button danger"
+                  type="button"
+                  aria-label="Delete node"
+                  onClick={() => removeStoryNode(selectedNode.id)}
+                  disabled={storyNodes.length === 1}
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+
+              <div className="form-grid">
+                <label>
+                  <span>鏍囬</span>
+                  <input
+                    value={selectedNode.title}
+                    onChange={(event) => updateSelectedNode('title', event.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>绫诲瀷</span>
+                  <select
+                    value={selectedNode.kind}
+                    onChange={(event) =>
+                      updateSelectedNode('kind', event.target.value as NodeKind)
+                    }
+                  >
+                    {nodeKinds.map((kind) => (
+                      <option key={kind}>{kind}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>鎸囨爣</span>
+                  <input
+                    value={selectedNode.metric}
+                    onChange={(event) => updateSelectedNode('metric', event.target.value)}
+                  />
+                </label>
+                <label className="wide-field">
+                  <span>鍓ф儏鎽樿</span>
+                  <textarea
+                    value={selectedNode.summary}
+                    onChange={(event) =>
+                      updateSelectedNode('summary', event.target.value)
+                    }
+                  />
+                </label>
+              </div>
+
+              <div className="choice-editor">
+                <div className="section-title light">
+                  <span>鐜╁閫夋嫨鍜屽垎鏀?</span>
+                  <button
+                    className="icon-button"
+                    type="button"
+                    onClick={addChoice}
+                    aria-label="Add choice"
+                  >
+                    <Plus size={16} />
+                  </button>
+                </div>
+                {selectedNode.choices.map((item, index) => (
+                  <article className="branch-row" key={item.id}>
+                    <label>
+                      <span>閫夋嫨鏂囨</span>
+                      <input
+                        value={item.label}
+                        onChange={(event) =>
+                          updateChoice(index, 'label', event.target.value)
+                        }
+                      />
+                    </label>
+                    <label>
+                      <span>鐩爣鑺傜偣</span>
+                      <select
+                        value={item.targetNodeId}
+                        onChange={(event) =>
+                          updateChoice(index, 'targetNodeId', event.target.value)
+                        }
+                      >
+                        {storyNodes.map((node) => (
+                          <option key={node.id} value={node.id}>
+                            {node.id} 路 {node.title}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="wide-field">
+                      <span>瑙﹀彂鏉′欢</span>
+                      <input
+                        value={item.condition}
+                        placeholder="渚嬪锛氱嚎绱?>= 3"
+                        onChange={(event) =>
+                          updateChoice(index, 'condition', event.target.value)
+                        }
+                      />
+                    </label>
+                    <button
+                      className="icon-button danger small branch-delete"
+                      type="button"
+                      aria-label="Remove choice"
+                      onClick={() => removeChoice(index)}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </article>
+                ))}
+              </div>
+            </section>
+
+            {player}
+
+            <section className="panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">Characters</p>
+                  <h2>瑙掕壊涓€鑷存€?</h2>
+                </div>
+                <button className="icon-button" type="button" onClick={addCharacter} aria-label="Add character">
+                  <Plus size={16} />
+                </button>
+              </div>
+              <div className="character-list editable">
+                {project.characters.map((character, index) => (
+                  <article className="character-card" key={`${character.name}-${index}`}>
+                    <div className="character-card-header">
+                      <span
+                        className="avatar-dot"
+                        style={{ background: character.color }}
+                      />
+                      <button
+                        className="icon-button danger small"
+                        type="button"
+                        aria-label="Remove character"
+                        onClick={() => removeCharacter(index)}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                    <label>
+                      <span>濮撳悕</span>
+                      <input
+                        value={character.name}
+                        onChange={(event) =>
+                          updateCharacter(index, 'name', event.target.value)
+                        }
+                      />
+                    </label>
+                    <label>
+                      <span>瑙掕壊瀹氫綅</span>
+                      <input
+                        value={character.role}
+                        onChange={(event) =>
+                          updateCharacter(index, 'role', event.target.value)
+                        }
+                      />
+                    </label>
+                    <label>
+                      <span>鎬ф牸涓庣瀵?</span>
+                      <textarea
+                        value={character.trait}
+                        onChange={(event) =>
+                          updateCharacter(index, 'trait', event.target.value)
+                        }
+                      />
+                    </label>
+                  </article>
+                ))}
+              </div>
+            </section>
+          </aside>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+export default App

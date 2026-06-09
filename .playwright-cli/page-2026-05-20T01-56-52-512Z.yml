@@ -1,0 +1,42 @@
+- main [ref=e3]:
+  - generic [ref=e828]:
+    - generic [ref=e829]:
+      - paragraph [ref=e830]: Local Share Preview
+      - heading "新的互动短剧" [level=1] [ref=e831]
+      - generic [ref=e832]: 悬疑互动短剧 · Paid Ending
+    - button "返回创作台" [ref=e833] [cursor=pointer]
+  - generic [ref=e835]:
+    - generic [ref=e836]:
+      - generic [ref=e837]:
+        - paragraph [ref=e838]: Playable Runtime
+        - heading "可玩预览" [level=2] [ref=e839]
+      - button "Restart preview" [ref=e840] [cursor=pointer]:
+        - img [ref=e841]
+    - generic [ref=e844]:
+      - generic [ref=e845]:
+        - generic [ref=e846]: 线索
+        - textbox "线索" [ref=e847]: "0"
+      - generic [ref=e848]:
+        - generic [ref=e849]: 信任
+        - textbox "信任" [ref=e850]: "1"
+      - generic [ref=e851]:
+        - generic [ref=e852]: 钥匙
+        - textbox "钥匙" [ref=e853]: "false"
+      - generic [ref=e854]:
+        - generic [ref=e855]: 压力
+        - textbox "压力" [ref=e856]: "0"
+    - generic [ref=e857]:
+      - generic [ref=e858]:
+        - generic [ref=e859]: S01
+        - strong [ref=e860]: 午夜来电
+        - paragraph [ref=e861]: 女主收到失踪哥哥的语音，背景里出现旧医院广播。
+      - button "接听第二通电话 进入 S02" [ref=e862] [cursor=pointer]:
+        - text: 接听第二通电话
+        - generic [ref=e863]: 进入 S02
+      - button "回拨陌生号码 锁定 · 线索 >= 1" [ref=e864] [cursor=pointer]:
+        - text: 回拨陌生号码
+        - generic [ref=e865]: 锁定 · 线索 >= 1
+      - button "进入 午夜来电的反证 进入 S05" [ref=e866] [cursor=pointer]:
+        - text: 进入 午夜来电的反证
+        - generic [ref=e867]: 进入 S05
+    - paragraph [ref=e868]: 已加载发布包 v2

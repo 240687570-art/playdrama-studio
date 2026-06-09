@@ -1,0 +1,42 @@
+- main [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - paragraph [ref=e6]: Local Share Preview
+      - heading "新的互动短剧" [level=1] [ref=e40]
+      - generic [ref=e8]: 悬疑互动短剧 · Paid Ending
+    - button "返回创作台" [ref=e9] [cursor=pointer]
+  - generic [ref=e11]:
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - paragraph [ref=e14]: Playable Runtime
+        - heading "可玩预览" [level=2] [ref=e15]
+      - button "Restart preview" [ref=e16] [cursor=pointer]:
+        - img [ref=e17]
+    - generic [ref=e20]:
+      - generic [ref=e21]:
+        - generic [ref=e22]: 线索
+        - textbox "线索" [ref=e23]: "0"
+      - generic [ref=e24]:
+        - generic [ref=e25]: 信任
+        - textbox "信任" [ref=e26]: "1"
+      - generic [ref=e27]:
+        - generic [ref=e28]: 钥匙
+        - textbox "钥匙" [ref=e29]: "false"
+      - generic [ref=e41]:
+        - generic [ref=e42]: 压力
+        - textbox "压力" [ref=e43]: "0"
+    - generic [ref=e30]:
+      - generic [ref=e31]:
+        - generic [ref=e32]: S02
+        - strong [ref=e33]: 门卫的谎言
+        - paragraph [ref=e34]: 玩家选择追问门卫、翻监控，或直接进入封锁楼层。
+      - button "追问门卫 进入 S03" [ref=e46] [cursor=pointer]:
+        - text: 追问门卫
+        - generic [ref=e47]: 进入 S03
+      - button "翻看监控 满足 · 信任 < 2" [ref=e48] [cursor=pointer]:
+        - text: 翻看监控
+        - generic [ref=e49]: 满足 · 信任 < 2
+      - button "进入封锁楼层 锁定 · 钥匙 = true" [ref=e50] [cursor=pointer]:
+        - text: 进入封锁楼层
+        - generic [ref=e51]: 锁定 · 钥匙 = true
+    - paragraph [ref=e39]: 进入 S02 · 门卫的谎言

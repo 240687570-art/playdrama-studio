@@ -1,0 +1,623 @@
+- main [ref=e3]:
+  - complementary "Workspace" [ref=e4]:
+    - generic [ref=e5]:
+      - img [ref=e7]
+      - generic [ref=e10]:
+        - strong [ref=e11]: PlayDrama
+        - generic [ref=e12]: AI 互动短剧工作台
+    - navigation "Main" [ref=e13]:
+      - button "项目总览" [ref=e14] [cursor=pointer]:
+        - img [ref=e15]
+        - text: 项目总览
+      - button "剧情编辑" [ref=e19] [cursor=pointer]:
+        - img [ref=e20]
+        - text: 剧情编辑
+      - button "角色资产" [ref=e24] [cursor=pointer]:
+        - img [ref=e25]
+        - text: 角色资产
+      - button "AI 导演" [ref=e30] [cursor=pointer]:
+        - img [ref=e31]
+        - text: AI 导演
+      - button "发布变现" [ref=e34] [cursor=pointer]:
+        - img [ref=e35]
+        - text: 发布变现
+    - generic [ref=e41]:
+      - generic [ref=e42]:
+        - generic [ref=e43]: 当前模板
+        - button "Add template" [ref=e44] [cursor=pointer]:
+          - img [ref=e45]
+      - generic [ref=e46]:
+        - img [ref=e47]
+        - generic [ref=e50]:
+          - strong [ref=e51]: 悬疑探案 v1
+          - generic [ref=e52]: 线索、密码锁、隐藏结局
+    - generic [ref=e53]:
+      - generic [ref=e55]: 工作区权限
+      - generic [ref=e56]:
+        - textbox "登录邮箱" [ref=e57]: creator@example.com
+        - textbox "显示名称" [ref=e58]: Creator
+        - generic [ref=e59]:
+          - button "登录" [ref=e60] [cursor=pointer]
+          - button "退出" [ref=e61] [cursor=pointer]
+        - generic [ref=e62]:
+          - generic [ref=e63]: 认证模式
+          - strong [ref=e64]: local-demo
+          - generic [ref=e65]: 本地演示 · 外部会话
+        - generic [ref=e66]: 本地登录已准备
+      - strong [ref=e68]: 数据库 · json · 本地/待迁移
+      - generic [ref=e69]:
+        - strong [ref=e70]: 商用体检 · 待配置
+        - generic [ref=e71]: 等待 API 同步
+      - generic [ref=e72]:
+        - generic [ref=e73]: 当前工作区
+        - combobox "当前工作区" [ref=e74]:
+          - option "Creator Studio" [selected]
+      - generic [ref=e75]:
+        - generic [ref=e76]: AI
+        - generic [ref=e77]:
+          - strong [ref=e78]: Creator Studio
+          - generic [ref=e79]: Creator · owner
+      - generic [ref=e81]: project:read
+      - generic [ref=e82]:
+        - textbox [ref=e83]: 短剧内测工作区
+        - button "新建" [ref=e84] [cursor=pointer]:
+          - img [ref=e85]
+          - text: 新建
+      - generic [ref=e86]: 工作区已准备
+  - generic [ref=e87]:
+    - generic [ref=e88]:
+      - generic [ref=e89]:
+        - paragraph [ref=e90]: MVP Prototype
+        - textbox [ref=e91]: 旧医院的第七通电话
+      - generic [ref=e92]:
+        - generic [ref=e93]:
+          - img [ref=e94]
+          - textbox [ref=e97]:
+            - /placeholder: 搜索节点、角色、变量
+        - generic [ref=e98]: 已同步本地
+        - button "导入" [ref=e99] [cursor=pointer]:
+          - img [ref=e100]
+          - text: 导入
+        - button "导出" [ref=e103] [cursor=pointer]:
+          - img [ref=e104]
+          - text: 导出
+        - button "重置" [ref=e107] [cursor=pointer]:
+          - img [ref=e108]
+          - text: 重置
+        - button "预览链接" [ref=e111] [cursor=pointer]:
+          - img [ref=e112]
+          - text: 预览链接
+        - button "保存" [ref=e118] [cursor=pointer]:
+          - img [ref=e119]
+          - text: 保存
+    - region "Studio command deck" [ref=e123]:
+      - region "Commercial launch status" [ref=e124]:
+        - generic [ref=e125]:
+          - generic [ref=e126]:
+            - img [ref=e127]
+            - generic [ref=e132]: Commercial Launch Workspace
+          - heading "从互动短剧创作，到上线验收和团队运营" [level=1] [ref=e133]
+          - paragraph [ref=e134]: 悬疑互动短剧 · Paid Ending · 商用门禁未通过
+          - generic "Launch summary" [ref=e135]:
+            - generic [ref=e136]:
+              - strong [ref=e137]: 同步中
+              - emphasis [ref=e138]: 上线进度
+            - generic [ref=e139]:
+              - strong [ref=e140]: owner
+              - emphasis [ref=e141]: 协作身份
+            - generic [ref=e142]:
+              - strong [ref=e143]: China Mainland
+              - emphasis [ref=e144]: 当前市场
+          - generic [ref=e145]:
+            - button "保存当前版本" [ref=e146] [cursor=pointer]:
+              - img [ref=e147]
+              - text: 保存当前版本
+            - button "打开预览" [ref=e151] [cursor=pointer]:
+              - img [ref=e152]
+              - text: 打开预览
+        - generic "Launch pipeline" [ref=e154]:
+          - generic [ref=e155]:
+            - generic [ref=e156]:
+              - img [ref=e157]
+              - text: launch gate
+            - strong [ref=e160]: 同步中
+          - generic [ref=e161]:
+            - generic [ref=e162]:
+              - generic [ref=e164]: Database
+              - strong [ref=e165]: Waiting setup
+            - generic [ref=e166]:
+              - generic [ref=e168]: Auth
+              - strong [ref=e169]: local-demo
+            - generic [ref=e170]:
+              - generic [ref=e172]: Readiness
+              - strong [ref=e173]: 同步中
+      - region "Production pipeline" [ref=e174]:
+        - article [ref=e175]:
+          - img [ref=e177]
+          - generic [ref=e180]:
+            - strong [ref=e181]: 创作图谱
+            - emphasis [ref=e182]: 4 scenes
+        - article [ref=e183]:
+          - img [ref=e185]
+          - generic [ref=e188]:
+            - strong [ref=e189]: 分支测试
+            - emphasis [ref=e190]: 9 links
+        - article [ref=e191]:
+          - img [ref=e193]
+          - generic [ref=e196]:
+            - strong [ref=e197]: 发布包
+            - emphasis [ref=e198]: Beta
+      - region "Project metrics" [ref=e199]:
+        - article [ref=e200]:
+          - img [ref=e201]
+          - generic [ref=e203]: 作品完成度
+          - strong [ref=e204]: 68%
+        - article [ref=e205]:
+          - img [ref=e206]
+          - generic [ref=e210]: 分支连线
+          - strong [ref=e211]: "9"
+        - article [ref=e212]:
+          - img [ref=e213]
+          - generic [ref=e216]: 状态变量
+          - strong [ref=e217]: "3"
+        - article [ref=e218]:
+          - img [ref=e219]
+          - generic [ref=e224]: 预计时长
+          - strong [ref=e225]: 8m 40s
+    - generic [ref=e226]:
+      - generic [ref=e227]:
+        - generic [ref=e228]:
+          - paragraph [ref=e229]: Workspace Projects
+          - heading "工作区作品" [level=2] [ref=e230]
+        - generic [ref=e231]:
+          - generic [ref=e232]: 项目列表已准备
+          - button "归档 0" [ref=e233] [cursor=pointer]
+          - button "新建作品" [ref=e234] [cursor=pointer]:
+            - img [ref=e235]
+            - text: 新建作品
+      - article [ref=e237]:
+        - strong [ref=e238]: 当前工作区还没有保存作品
+        - generic [ref=e239]: 点击保存或新建作品后，会出现在这里。
+    - generic [ref=e240]:
+      - generic [ref=e241]:
+        - generic [ref=e242]:
+          - generic [ref=e243]:
+            - paragraph [ref=e244]: Story Graph
+            - heading "剧情图谱" [level=2] [ref=e245]
+          - generic [ref=e246]:
+            - button "添加节点" [ref=e247] [cursor=pointer]:
+              - img [ref=e248]
+              - text: 添加节点
+            - button "生成下一幕" [ref=e249] [cursor=pointer]:
+              - img [ref=e250]
+              - text: 生成下一幕
+        - paragraph [ref=e253]: AI 可生成下一幕
+        - generic "Story graph canvas" [ref=e254]:
+          - button "S01 午夜来电 Hook S02 / S03" [ref=e255] [cursor=pointer]:
+            - generic [ref=e256]: S01
+            - strong [ref=e257]: 午夜来电
+            - emphasis [ref=e258]: Hook
+            - generic [ref=e259]: S02 / S03
+          - button "S02 门卫的谎言 Choice S03 / S03 / S04" [ref=e260] [cursor=pointer]:
+            - generic [ref=e261]: S02
+            - strong [ref=e262]: 门卫的谎言
+            - emphasis [ref=e263]: Choice
+            - generic [ref=e264]: S03 / S03 / S04
+          - button "S03 病历密码 Puzzle S04 / S02" [ref=e265] [cursor=pointer]:
+            - generic [ref=e266]: S03
+            - strong [ref=e267]: 病历密码
+            - emphasis [ref=e268]: Puzzle
+            - generic [ref=e269]: S04 / S02
+          - button "S04 地下室真相 Ending S04 / S04" [ref=e270] [cursor=pointer]:
+            - generic [ref=e271]: S04
+            - strong [ref=e272]: 地下室真相
+            - emphasis [ref=e273]: Ending
+            - generic [ref=e274]: S04 / S04
+        - generic [ref=e275]:
+          - button "1 S01 午夜来电 Hook 女主收到失踪哥哥的语音，背景里出现旧医院广播。 94% 继续" [ref=e276] [cursor=pointer]:
+            - generic [ref=e277]: "1"
+            - generic [ref=e278]:
+              - generic [ref=e279]:
+                - generic [ref=e280]: S01
+                - strong [ref=e281]: 午夜来电
+                - emphasis [ref=e282]: Hook
+              - generic [ref=e283]: 女主收到失踪哥哥的语音，背景里出现旧医院广播。
+            - generic [ref=e284]: 94% 继续
+            - img [ref=e285]
+          - button "2 S02 门卫的谎言 Choice 玩家选择追问门卫、翻监控，或直接进入封锁楼层。 3 条分支" [ref=e287] [cursor=pointer]:
+            - generic [ref=e288]: "2"
+            - generic [ref=e289]:
+              - generic [ref=e290]:
+                - generic [ref=e291]: S02
+                - strong [ref=e292]: 门卫的谎言
+                - emphasis [ref=e293]: Choice
+              - generic [ref=e294]: 玩家选择追问门卫、翻监控，或直接进入封锁楼层。
+            - generic [ref=e295]: 3 条分支
+            - img [ref=e296]
+          - button "3 S03 病历密码 Puzzle 收集三条线索后输入档案柜密码，失败触发警报。 42% 解开" [ref=e298] [cursor=pointer]:
+            - generic [ref=e299]: "3"
+            - generic [ref=e300]:
+              - generic [ref=e301]:
+                - generic [ref=e302]: S03
+                - strong [ref=e303]: 病历密码
+                - emphasis [ref=e304]: Puzzle
+              - generic [ref=e305]: 收集三条线索后输入档案柜密码，失败触发警报。
+            - generic [ref=e306]: 42% 解开
+            - img [ref=e307]
+          - button "4 S04 地下室真相 Ending 根据线索完整度进入普通结局、隐藏结局或死亡结局。 5 个结局" [ref=e309] [cursor=pointer]:
+            - generic [ref=e310]: "4"
+            - generic [ref=e311]:
+              - generic [ref=e312]:
+                - generic [ref=e313]: S04
+                - strong [ref=e314]: 地下室真相
+                - emphasis [ref=e315]: Ending
+              - generic [ref=e316]: 根据线索完整度进入普通结局、隐藏结局或死亡结局。
+            - generic [ref=e317]: 5 个结局
+            - img [ref=e318]
+      - complementary [ref=e320]:
+        - generic [ref=e321]:
+          - generic [ref=e323]:
+            - paragraph [ref=e324]: Model Routing
+            - heading "模型合规路由" [level=2] [ref=e325]
+          - generic [ref=e326]: 国内公开商用默认使用国内大模型；OpenAI/GPT 仅用于海外版或研究环境。
+          - generic [ref=e327]:
+            - generic [ref=e328]:
+              - generic [ref=e329]: 目标市场
+              - combobox "目标市场" [ref=e330]:
+                - option "China Mainland" [selected]
+                - option "Global"
+            - generic [ref=e331]:
+              - generic [ref=e332]: OpenAI 策略
+              - combobox "OpenAI 策略" [ref=e333]:
+                - option "Disabled for China public launch" [selected]
+                - option "Global only"
+                - option "Research only"
+            - generic [ref=e334]:
+              - generic [ref=e335]: 默认国内模型
+              - textbox "默认国内模型" [ref=e336]: DeepSeek / 通义千问 / 豆包 / 智谱 GLM
+            - generic [ref=e337]:
+              - generic [ref=e338]: 备用模型
+              - textbox "备用模型" [ref=e339]: Kimi / MiniMax / 腾讯混元
+        - generic [ref=e340]:
+          - generic [ref=e341]:
+            - generic [ref=e342]:
+              - paragraph [ref=e343]: Analytics
+              - heading "播放数据" [level=2] [ref=e344]
+            - generic [ref=e345]: 等待发布包
+          - generic [ref=e346]:
+            - article [ref=e347]:
+              - strong [ref=e348]: "0"
+              - generic [ref=e349]: 会话
+            - article [ref=e350]:
+              - strong [ref=e351]: "0"
+              - generic [ref=e352]: 节点浏览
+            - article [ref=e353]:
+              - strong [ref=e354]: "0"
+              - generic [ref=e355]: 选择点击
+            - article [ref=e356]:
+              - strong [ref=e357]: "0"
+              - generic [ref=e358]: 结局到达
+          - generic [ref=e360]: 发布后打开预览或点击选项，这里会出现事件。
+          - generic [ref=e361]:
+            - generic [ref=e362]:
+              - strong [ref=e363]: 节点热度
+              - generic [ref=e364]: 暂无节点浏览
+            - generic [ref=e365]:
+              - strong [ref=e366]: 当前节点选择
+              - article [ref=e367]:
+                - generic [ref=e368]: 接听第二通电话
+                - emphasis [ref=e369]: 0 次
+              - article [ref=e370]:
+                - generic [ref=e371]: 回拨陌生号码
+                - emphasis [ref=e372]: 0 次
+        - generic [ref=e373]:
+          - generic [ref=e374]:
+            - generic [ref=e375]:
+              - paragraph [ref=e376]: Publish
+              - heading "发布设置" [level=2] [ref=e377]
+            - generic [ref=e378]:
+              - button "生成发布包" [ref=e379] [cursor=pointer]:
+                - img [ref=e380]
+                - text: 生成发布包
+              - button "Open preview link" [ref=e384] [cursor=pointer]:
+                - img [ref=e385]
+          - generic [ref=e391]: 尚未生成发布包
+          - generic [ref=e392]:
+            - generic [ref=e393]:
+              - strong [ref=e394]: 发布版本
+              - generic [ref=e395]: 0 个快照
+            - generic [ref=e396]: 生成发布包后会保留可预览、可回载的版本。
+          - generic [ref=e397]:
+            - generic [ref=e398]:
+              - generic [ref=e399]: 状态
+              - combobox "状态" [ref=e400]:
+                - option "Draft"
+                - option "Beta" [selected]
+                - option "Public"
+            - generic [ref=e401]:
+              - generic [ref=e402]: 可见性
+              - combobox "可见性" [ref=e403]:
+                - option "Private"
+                - option "Unlisted" [selected]
+                - option "Public"
+            - generic [ref=e404]:
+              - generic [ref=e405]: 分类
+              - textbox "分类" [ref=e406]: 悬疑互动短剧
+            - generic [ref=e407]:
+              - generic [ref=e408]: 目标用户
+              - textbox "目标用户" [ref=e409]: 短剧创作者 / 悬疑玩家
+            - generic [ref=e410]:
+              - generic [ref=e411]: 变现
+              - combobox "变现" [ref=e412]:
+                - option "Free"
+                - option "Paid Ending" [selected]
+                - option "Paid Chapter"
+            - generic [ref=e413]:
+              - generic [ref=e414]: 价格
+              - textbox "价格" [ref=e415]: "9.9"
+        - generic [ref=e416]:
+          - generic [ref=e418]:
+            - paragraph [ref=e419]: Creator Beta
+            - heading "上线检查" [level=2] [ref=e420]
+          - generic [ref=e421]:
+            - generic [ref=e422]:
+              - generic [ref=e423]: ✓
+              - strong [ref=e424]: 完成剧情主线
+            - generic [ref=e425]:
+              - generic [ref=e426]: ✓
+              - strong [ref=e427]: 设置至少 3 个角色
+            - generic [ref=e428]:
+              - generic [ref=e429]: ✓
+              - strong [ref=e430]: 配置状态变量
+            - generic [ref=e431]:
+              - generic [ref=e432]: ✓
+              - strong [ref=e433]: 接通 5 条以上分支
+            - generic [ref=e434]:
+              - generic [ref=e435]: ✓
+              - strong [ref=e436]: 设置变现方式
+        - generic [ref=e437]:
+          - generic [ref=e439]:
+            - paragraph [ref=e440]: Team Access
+            - heading "团队权限" [level=2] [ref=e441]
+          - generic [ref=e442]:
+            - generic [ref=e443]:
+              - generic [ref=e444]: 邀请邮箱
+              - textbox "邀请邮箱" [ref=e445]: creator-beta@example.com
+            - generic [ref=e446]:
+              - generic [ref=e447]: 角色
+              - combobox "角色" [ref=e448]:
+                - option "editor · 创作编辑" [selected]
+                - option "analyst · 数据分析"
+                - option "viewer · 只读查看"
+                - option "owner · 管理员"
+            - button "邀请" [ref=e449] [cursor=pointer]:
+              - img [ref=e450]
+              - text: 邀请
+            - generic [ref=e455]: 可邀请内测成员
+          - generic [ref=e456]:
+            - strong [ref=e457]: 最近邀请邮件 · log · 本地/未配置
+            - paragraph [ref=e458]: 当前工作区还没有邀请邮件记录
+            - strong [ref=e460]: 正式服务商推荐
+        - generic [ref=e461]:
+          - generic [ref=e463]:
+            - paragraph [ref=e464]: Audit
+            - heading "项目活动" [level=2] [ref=e465]
+          - generic [ref=e466]:
+            - generic [ref=e467]:
+              - generic [ref=e468]: 当前作品
+              - strong [ref=e469]: 旧医院的第七通电话
+            - generic [ref=e470]:
+              - generic [ref=e471]: 动作筛选
+              - combobox "动作筛选" [ref=e472]:
+                - option "全部动作" [selected]
+                - option "创建作品"
+                - option "更新作品"
+                - option "生成发布包"
+                - option "邀请成员"
+                - option "创建工作区"
+          - generic [ref=e474]: 当前作品暂无匹配活动
+        - generic [ref=e475]:
+          - generic [ref=e477]:
+            - paragraph [ref=e478]: Workspace Audit
+            - heading "最近操作" [level=2] [ref=e479]
+          - generic [ref=e481]: 暂无后端操作记录
+        - generic [ref=e482]:
+          - generic [ref=e484]:
+            - paragraph [ref=e485]: Demo Gallery
+            - heading "样片库模型" [level=2] [ref=e486]
+          - generic [ref=e487]:
+            - article [ref=e488]:
+              - strong [ref=e489]: 旧医院的第七通电话
+              - generic [ref=e490]: 悬疑互动短剧
+              - emphasis [ref=e491]: Beta · 68%
+            - article [ref=e492]:
+              - strong [ref=e493]: 雨夜重逢的第三个选择
+              - generic [ref=e494]: 恋爱多结局
+              - emphasis [ref=e495]: Template · 42%
+            - article [ref=e496]:
+              - strong [ref=e497]: 电梯停在不存在的十三层
+              - generic [ref=e498]: 恐怖逃生
+              - emphasis [ref=e499]: Template · 35%
+        - generic [ref=e500]:
+          - generic [ref=e501]:
+            - generic [ref=e502]:
+              - paragraph [ref=e503]: Variables
+              - heading "变量条件" [level=2] [ref=e504]
+            - button "Add variable" [ref=e505] [cursor=pointer]:
+              - img [ref=e506]
+          - generic [ref=e507]:
+            - article [ref=e508]:
+              - textbox [ref=e509]: 线索
+              - combobox [ref=e510]:
+                - option "number" [selected]
+                - option "boolean"
+                - option "text"
+              - textbox [ref=e511]: "0"
+              - button "Remove variable" [ref=e512] [cursor=pointer]:
+                - img [ref=e513]
+            - article [ref=e516]:
+              - textbox [ref=e517]: 信任
+              - combobox [ref=e518]:
+                - option "number" [selected]
+                - option "boolean"
+                - option "text"
+              - textbox [ref=e519]: "1"
+              - button "Remove variable" [ref=e520] [cursor=pointer]:
+                - img [ref=e521]
+            - article [ref=e524]:
+              - textbox [ref=e525]: 钥匙
+              - combobox [ref=e526]:
+                - option "number"
+                - option "boolean" [selected]
+                - option "text"
+              - textbox [ref=e527]: "false"
+              - button "Remove variable" [ref=e528] [cursor=pointer]:
+                - img [ref=e529]
+        - generic [ref=e532]:
+          - generic [ref=e533]:
+            - generic [ref=e534]:
+              - paragraph [ref=e535]: Node Editor
+              - heading "节点编辑" [level=2] [ref=e536]
+            - button "Delete node" [ref=e537] [cursor=pointer]:
+              - img [ref=e538]
+          - generic [ref=e541]:
+            - generic [ref=e542]:
+              - generic [ref=e543]: 标题
+              - textbox "标题" [ref=e544]: 午夜来电
+            - generic [ref=e545]:
+              - generic [ref=e546]: 类型
+              - combobox "类型" [ref=e547]:
+                - option "Hook" [selected]
+                - option "Choice"
+                - option "Puzzle"
+                - option "Ending"
+            - generic [ref=e548]:
+              - generic [ref=e549]: 指标
+              - textbox "指标" [ref=e550]: 94% 继续
+            - generic [ref=e551]:
+              - generic [ref=e552]: 剧情摘要
+              - textbox "剧情摘要" [ref=e553]: 女主收到失踪哥哥的语音，背景里出现旧医院广播。
+          - generic [ref=e554]:
+            - generic [ref=e555]:
+              - generic [ref=e556]: 玩家选择和分支
+              - button "Add choice" [ref=e557] [cursor=pointer]:
+                - img [ref=e558]
+            - article [ref=e559]:
+              - generic [ref=e560]:
+                - generic [ref=e561]: 选择文案
+                - textbox "选择文案" [ref=e562]: 接听第二通电话
+              - generic [ref=e563]:
+                - generic [ref=e564]: 目标节点
+                - combobox "目标节点" [ref=e565]:
+                  - option "S01 · 午夜来电"
+                  - option "S02 · 门卫的谎言" [selected]
+                  - option "S03 · 病历密码"
+                  - option "S04 · 地下室真相"
+              - generic [ref=e566]:
+                - generic [ref=e567]: 触发条件
+                - textbox "触发条件" [ref=e568]:
+                  - /placeholder: 例如：线索 >= 3
+              - button "Remove choice" [ref=e569] [cursor=pointer]:
+                - img [ref=e570]
+            - article [ref=e573]:
+              - generic [ref=e574]:
+                - generic [ref=e575]: 选择文案
+                - textbox "选择文案" [ref=e576]: 回拨陌生号码
+              - generic [ref=e577]:
+                - generic [ref=e578]: 目标节点
+                - combobox "目标节点" [ref=e579]:
+                  - option "S01 · 午夜来电"
+                  - option "S02 · 门卫的谎言"
+                  - option "S03 · 病历密码" [selected]
+                  - option "S04 · 地下室真相"
+              - generic [ref=e580]:
+                - generic [ref=e581]: 触发条件
+                - textbox "触发条件" [ref=e582]:
+                  - /placeholder: 例如：线索 >= 3
+                  - text: 线索 >= 1
+              - button "Remove choice" [ref=e583] [cursor=pointer]:
+                - img [ref=e584]
+        - generic [ref=e587]:
+          - generic [ref=e588]:
+            - generic [ref=e589]:
+              - paragraph [ref=e590]: Playable Runtime
+              - heading "可玩预览" [level=2] [ref=e591]
+            - generic [ref=e592]: 1/4
+            - button "Restart preview" [ref=e593] [cursor=pointer]:
+              - img [ref=e594]
+          - generic [ref=e597]:
+            - generic [ref=e598]: Hook
+            - generic [ref=e599]: 1 个可选分支
+            - generic [ref=e600]: 25% 剧情进度
+          - generic [ref=e601]:
+            - generic [ref=e602]:
+              - generic [ref=e603]: 线索
+              - textbox "线索" [ref=e604]: "0"
+            - generic [ref=e605]:
+              - generic [ref=e606]: 信任
+              - textbox "信任" [ref=e607]: "1"
+            - generic [ref=e608]:
+              - generic [ref=e609]: 钥匙
+              - textbox "钥匙" [ref=e610]: "false"
+          - generic [ref=e611]:
+            - generic [ref=e612]:
+              - generic [ref=e613]:
+                - generic [ref=e614]: S01
+                - generic [ref=e615]: Hook
+              - generic [ref=e618]:
+                - strong [ref=e619]: 午夜来电
+                - paragraph [ref=e620]: 女主收到失踪哥哥的语音，背景里出现旧医院广播。
+            - button "接听第二通电话 进入 S02" [ref=e621] [cursor=pointer]:
+              - text: 接听第二通电话
+              - generic [ref=e622]: 进入 S02
+            - button "回拨陌生号码 锁定 · 线索 >= 1" [ref=e623] [cursor=pointer]:
+              - text: 回拨陌生号码
+              - generic [ref=e624]: 锁定 · 线索 >= 1
+          - generic [ref=e625]:
+            - generic [ref=e626]: 已走路径
+            - strong [ref=e627]: S01
+          - paragraph [ref=e628]: 试玩已准备
+        - generic [ref=e629]:
+          - generic [ref=e630]:
+            - generic [ref=e631]:
+              - paragraph [ref=e632]: Characters
+              - heading "角色一致性" [level=2] [ref=e633]
+            - button "Add character" [ref=e634] [cursor=pointer]:
+              - img [ref=e635]
+          - generic [ref=e636]:
+            - article [ref=e637]:
+              - button "Remove character" [ref=e640] [cursor=pointer]:
+                - img [ref=e641]
+              - generic [ref=e644]:
+                - generic [ref=e645]: 姓名
+                - textbox "姓名" [ref=e646]: 林雾
+              - generic [ref=e647]:
+                - generic [ref=e648]: 角色定位
+                - textbox "角色定位" [ref=e649]: 主角 / 调查记者
+              - generic [ref=e650]:
+                - generic [ref=e651]: 性格与秘密
+                - textbox "性格与秘密" [ref=e652]: 冷静、敏锐、害怕失去亲人
+            - article [ref=e653]:
+              - button "Remove character" [ref=e656] [cursor=pointer]:
+                - img [ref=e657]
+              - generic [ref=e660]:
+                - generic [ref=e661]: 姓名
+                - textbox "姓名" [ref=e662]: 沈既白
+              - generic [ref=e663]:
+                - generic [ref=e664]: 角色定位
+                - textbox "角色定位" [ref=e665]: 医生 / 可疑盟友
+              - generic [ref=e666]:
+                - generic [ref=e667]: 性格与秘密
+                - textbox "性格与秘密" [ref=e668]: 温和、克制、隐瞒关键记忆
+            - article [ref=e669]:
+              - button "Remove character" [ref=e672] [cursor=pointer]:
+                - img [ref=e673]
+              - generic [ref=e676]:
+                - generic [ref=e677]: 姓名
+                - textbox "姓名" [ref=e678]: 周砚
+              - generic [ref=e679]:
+                - generic [ref=e680]: 角色定位
+                - textbox "角色定位" [ref=e681]: 门卫 / 线索守门人
+              - generic [ref=e682]:
+                - generic [ref=e683]: 性格与秘密
+                - textbox "性格与秘密" [ref=e684]: 贪财、胆小、知道地下室入口

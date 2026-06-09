@@ -1,0 +1,4 @@
+name: one-person-company
+display_name: One Person Company
+short_description: Run a compact product team workflow inside Codex.
+default_prompt: Start one-person-company mode and help me build this feature.

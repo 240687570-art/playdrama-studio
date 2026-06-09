@@ -1,0 +1,231 @@
+{
+  "generatedAt": "2026-05-21T04:15:48.266Z",
+  "decision": "NO-GO",
+  "readiness": {
+    "status": "blocked",
+    "passed": 16,
+    "total": 17,
+    "items": [
+      {
+        "id": "database",
+        "area": "数据库 Database",
+        "label": "PostgreSQL / Supabase",
+        "ok": true,
+        "action": "设置 PLAYDRAMA_STORAGE_DRIVER=postgres，配置 DATABASE_URL 或启用 Netlify Database，并运行迁移和 db:verify。",
+        "missingFields": []
+      },
+      {
+        "id": "auth-provider",
+        "area": "登录 Auth",
+        "label": "真实账号供应商",
+        "ok": true,
+        "action": "接入 trusted-identity、Supabase Auth、Auth.js、微信登录或手机号登录。",
+        "missingFields": []
+      },
+      {
+        "id": "auth-provider-config",
+        "area": "登录 Auth",
+        "label": "账号供应商配置",
+        "ok": true,
+        "action": "根据 AUTH_PROVIDER 配置对应 URL、Client Key、Server Secret、OAuth 凭证或 trusted identity 共享密钥。",
+        "missingFields": []
+      },
+      {
+        "id": "auth-secret",
+        "area": "登录 Auth",
+        "label": "生产会话密钥",
+        "ok": true,
+        "action": "配置高强度 AUTH_SESSION_SECRET，或使用 Netlify Identity / trusted identity 上游托管会话。",
+        "missingFields": []
+      },
+      {
+        "id": "auth-adapter-verified",
+        "area": "登录 Auth",
+        "label": "真实登录适配器验收",
+        "ok": true,
+        "action": "完成真实登录、退出、会话恢复、邀请接受、审计归属验收后设置 AUTH_PROVIDER_ADAPTER_READY=true。",
+        "missingFields": []
+      },
+      {
+        "id": "email-provider",
+        "area": "邮件 Email",
+        "label": "真实邮件服务",
+        "ok": true,
+        "action": "国内商用优先 EMAIL_PROVIDER=aliyun-directmail 或 tencent-ses；海外测试可接 webhook。",
+        "missingFields": []
+      },
+      {
+        "id": "email-provider-config",
+        "area": "邮件 Email",
+        "label": "阿里云邮件推送凭证和发信地址",
+        "ok": true,
+        "action": "完成阿里云邮件推送发信域名或发信地址验证，配置 AccessKey、发信地址和回调密钥。",
+        "missingFields": []
+      },
+      {
+        "id": "email-live-mode",
+        "area": "邮件 Email",
+        "label": "真实发信模式",
+        "ok": true,
+        "action": "真实 staging 前关闭邮件服务 dry-run 模式。",
+        "missingFields": []
+      },
+      {
+        "id": "ai-provider",
+        "area": "AI 模型 AI",
+        "label": "国内商用模型供应商",
+        "ok": true,
+        "action": "国内公开商用优先选择 deepseek、qwen、doubao 或 zhipu。",
+        "missingFields": []
+      },
+      {
+        "id": "ai-key",
+        "area": "AI 模型 AI",
+        "label": "模型 API Key",
+        "ok": true,
+        "action": "根据 AI_PROVIDER 配置对应 API Key。",
+        "missingFields": []
+      },
+      {
+        "id": "ai-model-name",
+        "area": "AI 模型 AI",
+        "label": "默认模型名称",
+        "ok": true,
+        "action": "配置当前供应商的默认商用模型名，例如 deepseek-chat、qwen-plus、doubao-pro 或 glm-4。",
+        "missingFields": []
+      },
+      {
+        "id": "ai-adapter-verified",
+        "area": "AI 模型 AI",
+        "label": "真实模型适配器验收",
+        "ok": true,
+        "action": "完成真实剧情生成、分支生成、角色设定、质量检查调用后设置 AI_PROVIDER_ADAPTER_READY=true。",
+        "missingFields": []
+      },
+      {
+        "id": "ai-cost-tracking",
+        "area": "AI 模型 AI",
+        "label": "模型成本统计",
+        "ok": true,
+        "action": "记录每次模型调用的 provider、model、token、成本估算、workspaceId 和 projectId。",
+        "missingFields": []
+      },
+      {
+        "id": "payment-provider",
+        "area": "支付 Payment",
+        "label": "支付供应商",
+        "ok": true,
+        "action": "内测先配置 PAYMENT_PROVIDER=sandbox；正式收款接入支付宝、微信支付或 Stripe。",
+        "missingFields": []
+      },
+      {
+        "id": "payment-secret",
+        "area": "支付 Payment",
+        "label": "支付密钥",
+        "ok": true,
+        "action": "沙盒支付需完成 PAYMENT_SANDBOX_VERIFIED；真实支付需配置对应商户号、密钥和回调密钥。",
+        "missingFields": []
+      },
+      {
+        "id": "content-safety",
+        "area": "合规 Safety",
+        "label": "内容安全策略",
+        "ok": true,
+        "action": "启用 CONTENT_SAFETY_PROVIDER=local-rules 并完成本地策略验收，或接入内容审核服务并配置 CONTENT_SAFETY_API_KEY。",
+        "missingFields": []
+      },
+      {
+        "id": "deployment-url",
+        "area": "部署 Deploy",
+        "label": "公网 HTTPS 应用地址",
+        "ok": false,
+        "action": "部署后把 APP_BASE_URL 设置为 HTTPS 公网域名。",
+        "missingFields": [
+          "APP_BASE_URL"
+        ]
+      }
+    ],
+    "missing": [
+      {
+        "id": "deployment-url",
+        "area": "部署 Deploy",
+        "label": "公网 HTTPS 应用地址",
+        "ok": false,
+        "action": "部署后把 APP_BASE_URL 设置为 HTTPS 公网域名。",
+        "missingFields": [
+          "APP_BASE_URL"
+        ]
+      }
+    ]
+  },
+  "ownership": {
+    "database": {
+      "owner": "开发/云数据库负责人",
+      "acceptance": "执行 docs/database-schema.sql，运行 npm run db:import-json 和 npm run db:verify。"
+    },
+    "auth-provider": {
+      "owner": "开发/账号体系负责人",
+      "acceptance": "用真实账号登录，刷新后会话仍有效，/api/me 返回对应用户。"
+    },
+    "auth-provider-config": {
+      "owner": "开发/账号体系负责人",
+      "acceptance": "运行 npm run prod:verify，确认账号供应商配置项通过。"
+    },
+    "auth-secret": {
+      "owner": "开发/运维负责人",
+      "acceptance": "重启 API 后确认正式 Auth session/JWT 校验正常。"
+    },
+    "auth-adapter-verified": {
+      "owner": "开发/账号体系负责人",
+      "acceptance": "完成登录、退出、会话恢复、邀请接受、审计归属验收后再设置 AUTH_PROVIDER_ADAPTER_READY=true。"
+    },
+    "email-provider": {
+      "owner": "运营/邮件服务负责人",
+      "acceptance": "使用 EMAIL_PROVIDER=aliyun-directmail 发送真实邀请邮件，收件箱收到邮件。"
+    },
+    "email-provider-config": {
+      "owner": "运营/阿里云邮件负责人",
+      "acceptance": "阿里云邮件推送发信地址验证通过，真实 invite delivery 返回 providerMessageId。"
+    },
+    "email-live-mode": {
+      "owner": "运营/阿里云邮件负责人",
+      "acceptance": "ALIYUN_DM_DRY_RUN=false 后发送一封 staging 邀请。"
+    },
+    "ai-provider": {
+      "owner": "AI产品/模型负责人",
+      "acceptance": "用主模型生成一次剧情、分支和变量建议。"
+    },
+    "ai-key": {
+      "owner": "AI产品/模型负责人",
+      "acceptance": "记录一次模型调用成本和失败重试日志。"
+    },
+    "ai-model-name": {
+      "owner": "AI产品/模型负责人",
+      "acceptance": "确认 /api/ai/providers 显示当前默认模型名，并完成一次真实生成。"
+    },
+    "ai-adapter-verified": {
+      "owner": "AI工程/模型负责人",
+      "acceptance": "story_outline、expand_branch、character_bible、story_quality_check 四类任务至少各成功一次。"
+    },
+    "ai-cost-tracking": {
+      "owner": "AI工程/财务负责人",
+      "acceptance": "模型调用日志包含 provider、model、token、成本估算、workspaceId、projectId。"
+    },
+    "payment-provider": {
+      "owner": "商业化/支付负责人",
+      "acceptance": "完成 PAYMENT_PROVIDER=sandbox 沙盒下单、订单落库和付费结局解锁。"
+    },
+    "payment-secret": {
+      "owner": "商业化/支付负责人",
+      "acceptance": "npm run payment:sandbox:verify 通过；真实支付接入后再验签回调和伪造回调拒绝。"
+    },
+    "content-safety": {
+      "owner": "合规/内容安全负责人",
+      "acceptance": "对测试敏感内容返回拦截，对正常剧情返回通过。"
+    },
+    "deployment-url": {
+      "owner": "开发/运维负责人",
+      "acceptance": "公网 HTTPS 域名访问前端和 API，npm run readiness:api 指向预发域名通过。"
+    }
+  }
+}

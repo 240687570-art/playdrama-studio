@@ -1,0 +1,70 @@
+{
+  "generatedAt": "2026-05-20T09:48:37.082Z",
+  "decision": "READY_TO_VERIFY",
+  "source": {
+    "found": true,
+    "path": "D:\\代码\\playdrama-studio\\server\\data\\playdrama-db.json"
+  },
+  "environment": {
+    "storageDriver": "postgres",
+    "databaseUrlConfigured": true,
+    "dbPath": "D:\\代码\\playdrama-studio\\server\\data\\playdrama-db.json"
+  },
+  "counts": {
+    "users": {
+      "source": "users",
+      "target": "app_users",
+      "count": 38
+    },
+    "workspaces": {
+      "source": "workspaces",
+      "target": "workspaces",
+      "count": 23
+    },
+    "memberships": {
+      "source": "memberships",
+      "target": "workspace_memberships",
+      "count": 39
+    },
+    "projects": {
+      "source": "projects",
+      "target": "projects",
+      "count": 2
+    },
+    "builds": {
+      "source": "builds",
+      "target": "publish_builds",
+      "count": 4
+    },
+    "events": {
+      "source": "events",
+      "target": "analytics_events",
+      "count": 87
+    },
+    "aiUsageEvents": {
+      "source": "aiUsageEvents",
+      "target": "ai_usage_events",
+      "count": 1
+    },
+    "contentSafetyReviews": {
+      "source": "contentSafetyReviews",
+      "target": "content_safety_reviews",
+      "count": 2
+    },
+    "paymentOrders": {
+      "source": "paymentOrders",
+      "target": "payment_orders",
+      "count": 2
+    },
+    "auditLog": {
+      "source": "auditLog",
+      "target": "audit_log",
+      "count": 72
+    },
+    "inviteEmailDeliveries": {
+      "source": "inviteEmailDeliveries",
+      "target": "invite_email_deliveries",
+      "count": 12
+    }
+  }
+}

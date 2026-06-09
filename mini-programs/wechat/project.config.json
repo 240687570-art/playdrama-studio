@@ -1,0 +1,11 @@
+{
+  "appid": "touristappid",
+  "projectname": "playdrama-wechat-mini",
+  "setting": {
+    "urlCheck": true,
+    "es6": true,
+    "minified": true
+  },
+  "compileType": "miniprogram",
+  "libVersion": "latest"
+}

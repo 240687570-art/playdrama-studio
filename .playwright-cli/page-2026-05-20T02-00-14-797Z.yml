@@ -1,0 +1,36 @@
+- main [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - paragraph [ref=e6]: Local Share Preview
+      - heading "旧医院的第七通电话" [level=1] [ref=e7]
+      - generic [ref=e8]: 悬疑互动短剧 · Paid Ending
+    - button "返回创作台" [ref=e9] [cursor=pointer]
+  - generic [ref=e11]:
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - paragraph [ref=e14]: Playable Runtime
+        - heading "可玩预览" [level=2] [ref=e15]
+      - button "Restart preview" [ref=e16] [cursor=pointer]:
+        - img [ref=e17]
+    - generic [ref=e20]:
+      - generic [ref=e21]:
+        - generic [ref=e22]: 线索
+        - textbox "线索" [ref=e23]: "0"
+      - generic [ref=e24]:
+        - generic [ref=e25]: 信任
+        - textbox "信任" [ref=e26]: "1"
+      - generic [ref=e27]:
+        - generic [ref=e28]: 钥匙
+        - textbox "钥匙" [ref=e29]: "false"
+    - generic [ref=e30]:
+      - generic [ref=e31]:
+        - generic [ref=e32]: S01
+        - strong [ref=e33]: 午夜来电
+        - paragraph [ref=e34]: 女主收到失踪哥哥的语音，背景里出现旧医院广播。
+      - button "接听第二通电话 进入 S02" [ref=e35] [cursor=pointer]:
+        - text: 接听第二通电话
+        - generic [ref=e36]: 进入 S02
+      - button "回拨陌生号码 锁定 · 线索 >= 1" [ref=e37] [cursor=pointer]:
+        - text: 回拨陌生号码
+        - generic [ref=e38]: 锁定 · 线索 >= 1
+    - paragraph [ref=e39]: 正在加载发布作品

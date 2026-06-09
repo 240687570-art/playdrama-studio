@@ -1,0 +1,55 @@
+- main [ref=e3]:
+  - generic [ref=e905]:
+    - generic [ref=e906]:
+      - paragraph [ref=e907]: Local Share Preview
+      - heading "新的互动短剧" [level=1] [ref=e908]
+      - generic [ref=e909]: 悬疑互动短剧 · Paid Ending
+    - generic [ref=e910]:
+      - generic [ref=e911]: "build #f6fc9e"
+      - button "返回创作台" [ref=e912] [cursor=pointer]
+  - generic [ref=e914]:
+    - generic [ref=e915]:
+      - generic [ref=e916]:
+        - paragraph [ref=e917]: Playable Runtime
+        - heading "互动短剧" [level=2] [ref=e918]
+      - generic [ref=e919]: 1/6
+      - button "Restart preview" [ref=e920] [cursor=pointer]:
+        - img [ref=e921]
+    - generic [ref=e924]:
+      - generic [ref=e925]: Hook
+      - generic [ref=e926]: 2 个可选分支
+      - generic [ref=e927]: 17% 剧情进度
+    - generic [ref=e928]:
+      - generic [ref=e929]:
+        - generic [ref=e930]: 线索
+        - textbox "线索" [ref=e931]: "0"
+      - generic [ref=e932]:
+        - generic [ref=e933]: 信任
+        - textbox "信任" [ref=e934]: "1"
+      - generic [ref=e935]:
+        - generic [ref=e936]: 钥匙
+        - textbox "钥匙" [ref=e937]: "false"
+      - generic [ref=e938]:
+        - generic [ref=e939]: 压力
+        - textbox "压力" [ref=e940]: "0"
+    - generic [ref=e941]:
+      - generic [ref=e942]:
+        - generic [ref=e943]:
+          - generic [ref=e944]: S01
+          - generic [ref=e945]: Hook
+        - generic [ref=e948]:
+          - strong [ref=e949]: 午夜来电
+          - paragraph [ref=e950]: 女主收到失踪哥哥的语音，背景里出现旧医院广播。
+      - button "接听第二通电话 进入 S02" [ref=e951] [cursor=pointer]:
+        - text: 接听第二通电话
+        - generic [ref=e952]: 进入 S02
+      - button "回拨陌生号码 锁定 · 线索 >= 1" [ref=e953] [cursor=pointer]:
+        - text: 回拨陌生号码
+        - generic [ref=e954]: 锁定 · 线索 >= 1
+      - button "进入 午夜来电的反证 进入 S05" [ref=e955] [cursor=pointer]:
+        - text: 进入 午夜来电的反证
+        - generic [ref=e956]: 进入 S05
+    - generic [ref=e957]:
+      - generic [ref=e958]: 已走路径
+      - strong [ref=e959]: S01
+    - paragraph [ref=e960]: 已加载发布包 v3

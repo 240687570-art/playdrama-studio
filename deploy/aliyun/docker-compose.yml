@@ -1,0 +1,10 @@
+services:
+  playdrama:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    env_file:
+      - ../cloud-server.env
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8787:8787"

@@ -1,0 +1,10 @@
+{
+  "appid": "replace-with-douyin-mini-appid",
+  "projectname": "playdrama-douyin-mini",
+  "condition": {},
+  "setting": {
+    "urlCheck": true,
+    "es6": true,
+    "minified": true
+  }
+}

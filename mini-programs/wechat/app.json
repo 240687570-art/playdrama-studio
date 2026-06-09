@@ -1,0 +1,9 @@
+{
+  "pages": ["pages/play/index"],
+  "window": {
+    "navigationBarTitleText": "PlayDrama",
+    "navigationBarBackgroundColor": "#eaf8e7",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#eaf8e7"
+  }
+}
