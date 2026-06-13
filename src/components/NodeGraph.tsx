@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useState, useCallback, useRef } from 'react'
 
 interface NodePosition {
@@ -127,7 +128,7 @@ export function useBatchOperations() {
     setSelectedNodes(new Set())
   }, [])
 
-  const deleteSelected = useCallback((nodes: any[]) => {
+  const deleteSelected = useCallback(<T extends { id: string }>(nodes: T[]) => {
     return nodes.filter((node) => !selectedNodes.has(node.id))
   }, [selectedNodes])
 

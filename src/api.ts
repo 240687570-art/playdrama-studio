@@ -367,6 +367,79 @@ export async function fetchVideoGenerationJobs<TJob>(projectId: string) {
   return data.jobs
 }
 
+export async function fetchCanvasAssets<TAsset>(projectId: string) {
+  const data = await apiRequest<{ assets: TAsset[] }>(
+    `/api/projects/${encodeURIComponent(projectId)}/canvas/assets`,
+  )
+  return data.assets
+}
+
+export async function createCanvasAsset<TAsset>(
+  projectId: string,
+  input: {
+    type?: string
+    name?: string
+    meta?: string
+    source?: string
+    status?: string
+    fileName?: string
+    mimeType?: string
+    size?: number
+    url?: string
+    nodeId?: string
+  },
+) {
+  const data = await apiRequest<{ asset: TAsset }>(
+    `/api/projects/${encodeURIComponent(projectId)}/canvas/assets`,
+    {
+      method: 'POST',
+      body: input,
+    },
+  )
+  return data.asset
+}
+
+export async function fetchCanvasNodeRuns<TRun>(projectId: string) {
+  const data = await apiRequest<{ runs: TRun[] }>(
+    `/api/projects/${encodeURIComponent(projectId)}/canvas/node-runs`,
+  )
+  return data.runs
+}
+
+export async function runCanvasNode<TRun, TAsset>(
+  projectId: string,
+  nodeId: string,
+  input: {
+    nodeType?: string
+    prompt?: string
+    model?: string
+  },
+) {
+  return apiRequest<{ run: TRun; asset: TAsset }>(
+    `/api/projects/${encodeURIComponent(projectId)}/canvas/nodes/${encodeURIComponent(nodeId)}/run`,
+    {
+      method: 'POST',
+      body: input,
+    },
+  )
+}
+
+export async function runCanvasWorkflow<TWorkflow, TRun, TAsset>(
+  projectId: string,
+  input: {
+    scope?: 'all' | 'downstream'
+    startNodeId?: string
+  } = {},
+) {
+  return apiRequest<{ workflow: TWorkflow; runs: TRun[]; assets: TAsset[] }>(
+    `/api/projects/${encodeURIComponent(projectId)}/canvas/workflows/run`,
+    {
+      method: 'POST',
+      body: input,
+    },
+  )
+}
+
 export async function fetchFinalVideoRenders<TRender>(projectId: string) {
   const data = await apiRequest<{ renders: TRender[] }>(
     `/api/projects/${encodeURIComponent(projectId)}/video/renders`,

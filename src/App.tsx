@@ -1,6 +1,7 @@
-﻿import {
+import {
   type ChangeEvent,
-  type FormEvent,
+  type PointerEvent as ReactPointerEvent,
+  type WheelEvent as ReactWheelEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -30,13 +31,17 @@ import {
   CheckCircle2,
   Clapperboard,
   Clipboard,
+  Grid3x3,
+  Video,
   Download,
   ExternalLink,
   FileText,
+  Flame,
   GitBranch,
   KeyRound,
   Megaphone,
   Layers3,
+  Minus,
   Play,
   Plus,
   QrCode,
@@ -52,16 +57,24 @@ import {
   Upload,
   Users,
   Wand2,
+  Sun,
+  Moon,
+  Zap,
 } from 'lucide-react'
 import './App.css'
+import { AiVideoGenerator } from './components/AiVideoGenerator'
+import { StoryboardDesigner } from './components/StoryboardDesigner'
+import { SkillsMarketplace } from './components/SkillsMarketplace'
 import { AiInteractiveStoryGenerator } from './components/AiInteractiveStoryGenerator'
 import { AnalyticsDashboard } from './components/AnalyticsDashboard'
+import { useTheme } from './hooks/useTheme'
 import {
   acceptInvitation,
   cancelWorkspaceInvitation,
   createFinalVideoRender,
   createDistributionJob,
   createAiGenerationJob,
+  createCanvasAsset,
   createRuntimeOrder,
   createVideoGenerationJobsBatch,
   createWorkspace,
@@ -72,6 +85,8 @@ import {
   fetchAiUsageEvents,
   fetchAuthProvider,
   fetchAnalyticsEvents,
+  fetchCanvasAssets,
+  fetchCanvasNodeRuns,
   fetchContentSafetyReviews,
   fetchDistributionJobs,
   fetchDistributionProvider,
@@ -102,10 +117,12 @@ import {
   refreshVideoGenerationJob,
   retryFinalVideoRender,
   retryVideoGenerationJob,
+  runCanvasNode as runRemoteCanvasNode,
+  runCanvasWorkflow as runRemoteCanvasWorkflow,
   resendWorkspaceInvitation,
   saveRemoteProject,
   scanProjectContentSafety,
-  submitLeadApplication,
+
   updateInviteDelivery,
   updateFinalVideoRenderReview,
   updatePaymentOrderOps,
@@ -116,7 +133,8 @@ import {
 
 type NodeKind = 'Hook' | 'Choice' | 'Puzzle' | 'Ending'
 type NodePaywall = 'free' | 'paid'
-type StudioPage = 'overview' | 'creation' | 'story' | 'characters' | 'ai' | 'publish'
+type StudioPage = 'overview' | 'creation' | 'story' | 'characters' | 'ai' | 'publish' | 'video' | 'storyboard' | 'skills'
+type LibtvCanvasDrawerTab = 'node' | 'assets' | 'history' | 'toolbox'
 type CreationStageId =
   | 'inspiration'
   | 'synopsis'
@@ -125,7 +143,7 @@ type CreationStageId =
   | 'script'
   | 'interaction'
   | 'publish'
-const studioPageIds: StudioPage[] = ['overview', 'creation', 'story', 'characters', 'ai', 'publish']
+const studioPageIds: StudioPage[] = ['overview', 'creation', 'story', 'characters', 'ai', 'publish', 'video', 'storyboard', 'skills']
 type DistributionChannel =
   | 'douyin'
   | 'douyin-mini'
@@ -134,7 +152,7 @@ type DistributionChannel =
   | 'xiaohongshu'
   | 'private'
 
-type MarketingLead = {
+export type MarketingLead = {
   id: string
   name: string
   company: string
@@ -159,35 +177,73 @@ const studioPageCopy: Record<
   { eyebrow: string; title: string; searchPlaceholder: string }
 > = {
   overview: {
-    eyebrow: '上线工作台',
-    title: '项目总览',
-    searchPlaceholder: '搜索作品、节点、角色',
+    eyebrow: '发现',
+    title: '作品与模板',
+    searchPlaceholder: '搜索作品、模板、角色',
   },
   creation: {
-    eyebrow: '创作模式',
-    title: '从灵感到可发布剧本',
-    searchPlaceholder: '搜索梗概、人物、分集、正文',
+    eyebrow: '开始创作',
+    title: '一句话生成短剧',
+    searchPlaceholder: '搜索梗概、人物、分集',
   },
   story: {
-    eyebrow: '剧情编辑',
-    title: '剧情图谱和节点编辑',
+    eyebrow: '创作画布',
+    title: '互动短剧画布',
     searchPlaceholder: '搜索节点、变量、选择',
   },
   characters: {
-    eyebrow: '角色资产',
-    title: '角色一致性资产',
-    searchPlaceholder: '搜索角色、定位、性格',
+    eyebrow: '资产',
+    title: '角色与素材',
+    searchPlaceholder: '搜索角色、素材、标签',
   },
   ai: {
-    eyebrow: '普通短剧',
-    title: '普通短剧创作平台',
-    searchPlaceholder: '搜索题材、分集、正文、视频脚本',
+    eyebrow: '脚本',
+    title: '普通短剧生成',
+    searchPlaceholder: '搜索题材、分集、正文',
   },
   publish: {
-    eyebrow: '发布变现',
-    title: '发布包、数据和付费设置',
+    eyebrow: '发布',
+    title: '发布、收款和数据',
     searchPlaceholder: '搜索版本、数据、设置',
   },
+  video: {
+    eyebrow: '视频',
+    title: 'AI 视频生成',
+    searchPlaceholder: '搜索视频、分镜、场景',
+  },
+  storyboard: {
+    eyebrow: '分镜',
+    title: '故事板和镜头',
+    searchPlaceholder: '搜索分镜、镜头、场景',
+  },
+  skills: {
+    eyebrow: '工具箱',
+    title: '模板和能力',
+    searchPlaceholder: '搜索技能、模板、工具',
+  },
+}
+
+function readStudioPageFromHash(hash = window.location.hash): StudioPage | null {
+  const rawHash = hash.replace(/^#/, '')
+  const [hashPath, hashQuery = ''] = rawHash.split('?')
+  const hashParams = new URLSearchParams(hashQuery)
+  const requestedQueryPage = hashParams.get('page')
+  if (studioPageIds.includes(requestedQueryPage as StudioPage)) {
+    return requestedQueryPage as StudioPage
+  }
+
+  const segments = hashPath.split('/').filter(Boolean)
+  const studioIndex = segments.indexOf('studio')
+  const requestedPathPage = studioIndex >= 0 ? segments[studioIndex + 1] : ''
+  if (studioPageIds.includes(requestedPathPage as StudioPage)) {
+    return requestedPathPage as StudioPage
+  }
+  if (segments[0] === 'studio') return 'overview'
+  return null
+}
+
+function formatStudioHash(page: StudioPage) {
+  return page === 'overview' ? '#/studio' : `#/studio/${page}`
 }
 
 type StoryChoice = {
@@ -197,14 +253,111 @@ type StoryChoice = {
   condition: string
 }
 
+type LibtvNodeType = 'text' | 'image' | 'video' | 'audio' | 'composite' | 'director' | 'script'
+type NodeRunStatus = 'idle' | 'queued' | 'running' | 'succeeded' | 'failed'
+type CanvasAssetType = 'script' | 'image' | 'video' | 'audio' | 'composite'
+
+type NodeRunRecord = {
+  id?: string
+  projectId?: string
+  workspaceId?: string
+  nodeId?: string
+  nodeType?: LibtvNodeType
+  assetId?: string
+  status: NodeRunStatus
+  progress: number
+  message: string
+  outputTitle: string
+  outputPreview: string
+  updatedAt: string
+  createdAt?: string
+  credits: number
+}
+
+type CanvasAsset = {
+  id: string
+  projectId?: string
+  workspaceId?: string
+  type: CanvasAssetType
+  name: string
+  meta: string
+  source: string
+  status: 'ready' | 'processing' | 'failed'
+  createdAt: string
+  updatedAt?: string
+  nodeId?: string
+  fileName?: string
+  mimeType?: string
+  size?: number
+  url?: string
+}
+
+type CanvasWorkflowRun = {
+  id: string
+  projectId: string
+  status: 'running' | 'succeeded' | 'failed'
+  nodeIds: string[]
+  runIds: string[]
+  credits: number
+  message: string
+  createdAt: string
+  updatedAt: string
+  completedAt?: string | null
+}
+
 type StoryNode = {
   id: string
   title: string
   kind: NodeKind
+  nodeType?: LibtvNodeType
   summary: string
   metric: string
+  prompt?: string
+  model?: string
   paywall?: NodePaywall
   choices: StoryChoice[]
+}
+
+const libtvNodeTypes: LibtvNodeType[] = ['text', 'image', 'video', 'audio', 'composite', 'director', 'script']
+const libtvNodeTypeLabels: Record<LibtvNodeType, string> = {
+  text: '文本',
+  image: '图片',
+  video: '视频',
+  audio: '音频',
+  composite: '视频合成',
+  director: '导演台',
+  script: '脚本',
+}
+const libtvNodeTypeModels: Record<LibtvNodeType, string> = {
+  text: 'Story Writer',
+  image: 'Image Reference',
+  video: 'Video Prompt',
+  audio: 'Voice & BGM',
+  composite: 'Final Composer',
+  director: 'Director Board',
+  script: 'Script Engine',
+}
+
+function getLibtvNodeType(node: Pick<StoryNode, 'nodeType' | 'kind'>): LibtvNodeType {
+  if (node.nodeType && libtvNodeTypes.includes(node.nodeType)) return node.nodeType
+  if (node.kind === 'Hook') return 'script'
+  if (node.kind === 'Puzzle') return 'director'
+  if (node.kind === 'Ending') return 'composite'
+  return 'text'
+}
+
+function inferCanvasAssetType(fileName: string, mimeType: string): CanvasAssetType {
+  if (mimeType.startsWith('image/')) return 'image'
+  if (mimeType.startsWith('video/')) return 'video'
+  if (mimeType.startsWith('audio/')) return 'audio'
+  if (/\.(mp4|mov|webm)$/i.test(fileName)) return 'video'
+  if (/\.(png|jpe?g|webp|gif)$/i.test(fileName)) return 'image'
+  if (/\.(mp3|wav|m4a|aac)$/i.test(fileName)) return 'audio'
+  return 'script'
+}
+
+type StoryCanvasLayout = {
+  nodePositions?: Record<string, { x: number; y: number }>
 }
 
 type StoryVariable = {
@@ -228,6 +381,7 @@ type StoryProject = {
   publish: PublishSettings
   modelRouting: ModelRouting
   nodes: StoryNode[]
+  canvasLayout?: StoryCanvasLayout
   variables: StoryVariable[]
   characters: Character[]
   lifecycleStatus?: 'active' | 'archived'
@@ -1149,6 +1303,7 @@ const defaultModelRouting: ModelRouting = {
 }
 
 const STORAGE_KEY = 'playdrama.storyProject.v1'
+const QUICK_PROMPT_STORAGE_KEY = 'playdrama.quickCreatePrompt.v1'
 const WORKSPACE_STORAGE_KEY = 'playdrama.activeWorkspace.v1'
 const nodeKinds: NodeKind[] = ['Hook', 'Choice', 'Puzzle', 'Ending']
 const variableTypes: StoryVariable['type'][] = ['number', 'boolean', 'text']
@@ -1965,6 +2120,34 @@ function normalizeChoices(node: Partial<StoryNode>, nodeIndex: number): StoryCho
   })
 }
 
+function normalizeCanvasLayout(value: Partial<StoryProject>): StoryCanvasLayout | undefined {
+  const rawPositions = value.canvasLayout?.nodePositions
+  if (!rawPositions || typeof rawPositions !== 'object') return undefined
+
+  const nodeIds = new Set(
+    Array.isArray(value.nodes)
+      ? value.nodes.map((node) => node?.id).filter((id): id is string => typeof id === 'string')
+      : [],
+  )
+  const nodePositions = Object.entries(rawPositions).reduce<Record<string, { x: number; y: number }>>(
+    (positions, [nodeId, position]) => {
+      if (!nodeIds.has(nodeId) || !position || typeof position !== 'object') return positions
+      const candidate = position as { x?: unknown; y?: unknown }
+      const x = Number(candidate.x)
+      const y = Number(candidate.y)
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return positions
+      positions[nodeId] = {
+        x: Math.max(16, Math.min(5000, x)),
+        y: Math.max(16, Math.min(3000, y)),
+      }
+      return positions
+    },
+    {},
+  )
+
+  return Object.keys(nodePositions).length > 0 ? { nodePositions } : undefined
+}
+
 function normalizeProject(value: unknown): StoryProject {
   if (!value || typeof value !== 'object') return sampleProject
   const project = value as Partial<StoryProject>
@@ -1984,8 +2167,11 @@ function normalizeProject(value: unknown): StoryProject {
     id: node.id || `S${String(index + 1).padStart(2, '0')}`,
     title: node.title || '未命名节',
     kind: node.kind || 'Choice',
+    nodeType: node.nodeType && libtvNodeTypes.includes(node.nodeType) ? node.nodeType : undefined,
     summary: node.summary || '',
     metric: node.metric || '待测',
+    prompt: typeof node.prompt === 'string' ? node.prompt : '',
+    model: typeof node.model === 'string' ? node.model : '',
     paywall: node.paywall === 'paid' || node.paywall === 'free' ? node.paywall : undefined,
     choices: normalizeChoices(node, index),
   }))
@@ -1997,6 +2183,7 @@ function normalizeProject(value: unknown): StoryProject {
     publish: project.publish || defaultPublishSettings,
     modelRouting: project.modelRouting || defaultModelRouting,
     nodes,
+    canvasLayout: normalizeCanvasLayout(project),
     variables: Array.isArray(project.variables) ? project.variables : initialVariables,
     characters: project.characters,
     lifecycleStatus: project.lifecycleStatus || 'active',
@@ -2037,6 +2224,14 @@ function loadActiveWorkspaceId() {
     return readStoredValue(WORKSPACE_STORAGE_KEY) || DEFAULT_WORKSPACE_ID
   } catch {
     return DEFAULT_WORKSPACE_ID
+  }
+}
+
+function loadStoredQuickPrompt(fallback: string) {
+  try {
+    return readStoredValue(QUICK_PROMPT_STORAGE_KEY) || fallback
+  } catch {
+    return fallback
   }
 }
 
@@ -2094,6 +2289,118 @@ function truncateProductionText(value: string, fallback: string, maxLength = 58)
   const normalized = value.trim().replace(/\s+/g, ' ')
   if (!normalized) return fallback
   return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}...` : normalized
+}
+
+function buildQuickInteractiveProject(
+  brief: SeriesGeneratorInput,
+  baseProject: StoryProject,
+): StoryProject {
+  const idea = brief.idea.trim() || '普通女孩发现自己每次刷到同一条短视频，现实都会跟着改写'
+  const titleSeed = idea.split(/[，。,.!?！？]/).find(Boolean) || idea
+  const title = truncateProductionText(titleSeed, '一键互动短剧', 14)
+  const paidEnabled = brief.monetization === 'Paid Ending'
+  const nodes: StoryNode[] = [
+    {
+      id: 'I01',
+      title: '前三秒钩子',
+      kind: 'Hook',
+      summary: `${idea}。开场直接抛出异常事件，让观众在第一幕就知道自己可以改变走向。`,
+      metric: '可试玩开场',
+      choices: [
+        choice('IQ01', '立刻追查异常来源', 'I02'),
+        choice('IQ02', '先隐藏真相观察身边人', 'I03'),
+      ],
+    },
+    {
+      id: 'I02',
+      title: '主动追查',
+      kind: 'Choice',
+      summary: `主角选择主动出击，发现这件事和一个被故意删除的关键线索有关。`,
+      metric: '主线推进',
+      choices: [
+        choice('IQ03', '公开线索逼对方摊牌', 'I04', '线索 >= 1'),
+        choice('IQ04', '把线索交给最可信的人', 'I03', '信任 >= 1'),
+      ],
+    },
+    {
+      id: 'I03',
+      title: '信任测试',
+      kind: 'Puzzle',
+      summary: `主角必须判断谁在说谎。观众的选择会影响信任值，并决定能不能进入隐藏真相。`,
+      metric: '分支判断',
+      choices: [
+        choice('IQ05', '相信身边人，继续合作', 'I04', '信任 >= 1'),
+        choice('IQ06', paidEnabled ? '付费解锁隐藏证据' : '查看隐藏证据', 'I05'),
+      ],
+    },
+    {
+      id: 'I04',
+      title: '免费结局：表面真相',
+      kind: 'Ending',
+      summary: `主角解决了眼前危机，但最后一秒留下新的反转，适合作为免费线完整结局。`,
+      metric: '免费结局',
+      paywall: 'free',
+      choices: [],
+    },
+    {
+      id: 'I05',
+      title: '隐藏结局：真正操控者',
+      kind: 'Ending',
+      summary: `隐藏证据揭示真正操控者，解释开场异常事件的来源，并给观众一个更强反转。`,
+      metric: paidEnabled ? `付费结局 CNY ${brief.price || '3.9'}` : '隐藏结局',
+      paywall: paidEnabled ? 'paid' : 'free',
+      choices: [],
+    },
+  ]
+
+  return normalizeProject({
+    ...baseProject,
+    id: createClientId('playdrama-interactive'),
+    title,
+    template: `${brief.genre} 一键互动短剧`,
+    publish: {
+      ...baseProject.publish,
+      status: 'Draft',
+      visibility: 'Private',
+      category: '互动短剧',
+      audience: brief.audience,
+      monetization: brief.monetization,
+      price: brief.price || (paidEnabled ? '3.9' : '0'),
+    },
+    modelRouting: {
+      ...baseProject.modelRouting,
+      market: 'China Mainland',
+    },
+    nodes,
+    variables: [
+      { id: 'clues', label: '线索', type: 'number', defaultValue: '1' },
+      { id: 'trust', label: '信任', type: 'number', defaultValue: '1' },
+      { id: 'hiddenProof', label: '隐藏证据', type: 'boolean', defaultValue: 'false' },
+    ],
+    characters:
+      baseProject.characters.length > 0
+        ? baseProject.characters
+        : [
+            {
+              name: '主角',
+              role: '被卷入异常事件的人',
+              trait: '直觉敏锐，必须在信任和真相之间做选择',
+              color: '#14b8a6',
+            },
+          ],
+    canvasLayout: {
+      nodePositions: {
+        I01: { x: 90, y: 220 },
+        I02: { x: 410, y: 120 },
+        I03: { x: 410, y: 330 },
+        I04: { x: 760, y: 145 },
+        I05: { x: 760, y: 350 },
+      },
+    },
+    lifecycleStatus: 'active',
+    archivedAt: null,
+    updatedAt: new Date().toISOString(),
+  })
 }
 
 function buildProductionReviewPackage(
@@ -2409,482 +2716,13 @@ function buildProductionReviewPackage(
   }
 }
 
-function PublicLandingPage() {
-  const [leadForm, setLeadForm] = useState({
-    name: '',
-    company: '',
-    role: '短剧团队',
-    phone: '',
-    email: '',
-    scenario: '互动短剧内测',
-    message: '',
-  })
-  const [leadState, setLeadState] = useState<'idle' | 'submitting' | 'success' | 'error'>(
-    'idle',
-  )
-  const [leadMessage, setLeadMessage] = useState('留下信息后，我们会优先安排产品演示')
 
-  const updateLeadField =
-    (field: keyof typeof leadForm) =>
-    (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-      setLeadForm((current) => ({ ...current, [field]: event.target.value }))
-      if (leadState !== 'submitting') {
-        setLeadState('idle')
-        setLeadMessage('留下信息后，我们会优先安排产品演示')
-      }
-    }
-
-  async function submitLead(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    setLeadState('submitting')
-    setLeadMessage('正在提交申请')
-
-    try {
-      const lead = await submitLeadApplication<MarketingLead>({
-        ...leadForm,
-        source: 'public-landing-page',
-      })
-      setLeadState('success')
-      setLeadMessage(`已收到，线索编号 ${lead.id.slice(-6)}，我们会尽快联系你`)
-      setLeadForm((current) => ({
-        ...current,
-        name: '',
-        company: '',
-        phone: '',
-        email: '',
-        message: '',
-      }))
-    } catch (error) {
-        logError('api', error)
-      setLeadState('error')
-      const message = error instanceof Error ? error.message : '提交失败'
-      setLeadMessage(
-        message.includes('contact_required')
-          ? '请至少填写手机号或邮箱'
-          : message.includes('invalid_phone')
-            ? '手机号格式不对，请填写中国大陆手机号'
-            : message.includes('invalid_email')
-              ? '邮箱格式不对'
-              : '提交失败，请稍后再试',
-      )
-    }
-  }
-
-  const publicShowcaseItems = [
-    {
-      title: '旧医院的第七通电',
-      genre: '悬疑互动',
-      stats: '7 节点 · 2 结局 · 付费隐藏线',
-      copy: '一句题材生成可试玩剧情图谱，再继续细修角色、变量和结局门槛。',
-      media: 'video',
-      sampleId: 'hospital',
-    },
-    {
-      title: '雨夜便利店最后一张小票',
-      genre: '都市反转',
-      stats: '6 节点 · 2 结局 · H5 预览',
-      copy: '适合抖音、小程序和私域引流的短剧情节，先有样片，再进发布。',
-      media: 'image',
-      sampleId: 'receipt',
-    },
-    {
-      title: '全宗上下，拼不出一个好人',
-      genre: '玄幻喜剧',
-      stats: '7 节点 · 角色一致性 · 分支复盘',
-      copy: '把爽点、反转和互动选择放进同一个生产面板，交付不靠口头同步。',
-      media: 'image',
-      sampleId: 'sect',
-    },
-  ]
-  const publicHeroPosters = [
-    {
-      title: '旧医院的第七通电',
-      tag: '悬疑互动',
-      metric: '付费隐藏线',
-    },
-    {
-      title: '雨夜便利店最后一张小票',
-      tag: '都市反转',
-      metric: 'H5 试玩',
-    },
-    {
-      title: '全宗上下，拼不出一个好人',
-      tag: '玄幻喜剧',
-      metric: '分支复盘',
-    },
-    {
-      title: '醒来后，我成了她的证词',
-      tag: '情绪爽点',
-      metric: '短剧生产包',
-    },
-    {
-      title: '最后一幕才知道谁在说谎',
-      tag: '反转结局',
-      metric: '微信 0.01 验收',
-    },
-  ]
-  const publicHomeFeatures = [
-    '新建剧本',
-    '网文改编',
-    '剧本评估',
-    '短剧拉片',
-    '发布收款',
-  ]
-
-  return (
-    <main className="public-site public-site-cinematic">
-      <header className="public-nav">
-        <a className="public-brand" href="/" aria-label="PlayDrama landing">
-          <span className="public-brand-mark">
-            <Sparkles size={20} />
-          </span>
-          <span>
-            <strong>PlayDrama</strong>
-            <em>AI 互动短剧工作台</em>
-          </span>
-        </a>
-        <nav aria-label="Public navigation">
-          <a href="#showcase">样片展示</a>
-          <a href="#market">国内机会</a>
-          <a href="#workflow">产品闭环</a>
-          <a href="#apply">申请内测</a>
-          <a className="public-studio-link" href="/studio">
-            进入工作台
-          </a>
-        </nav>
-      </header>
-
-      <section className="public-hero" aria-labelledby="public-hero-title">
-        <div className="public-hero-backdrop" aria-hidden="true" />
-        <div className="public-hero-content">
-          <p className="public-kicker">
-            <Rocket size={18} />
-            短剧创作、互动发布和收款闭环
-          </p>
-          <h1 id="public-hero-title">PlayDrama</h1>
-          <p className="public-hero-line">
-            给短剧团队和服务商的一套 AI 制作台：从一句创意生成剧本生产包，再升级成可选择、可付费、可复盘的互动短剧。
-          </p>
-          <div className="public-hero-tabs" aria-label="PlayDrama creation entries">
-            {publicHomeFeatures.map((item) => (
-              <a href={item === '发布收款' ? '/studio?page=publish' : '/studio?page=creation'} key={item}>
-                {item}
-              </a>
-            ))}
-          </div>
-          <div className="public-hero-actions" aria-label="Primary actions">
-            <a className="public-primary-action" href="/studio">
-              制作互动短剧
-              <ChevronRight size={18} />
-            </a>
-            <a className="public-primary-action" href="/studio?generate=1">
-              生成常规短剧
-              <ChevronRight size={18} />
-            </a>
-            <a className="public-secondary-action" href="#showcase">
-              <Play size={18} fill="currentColor" />
-              看样片
-            </a>
-            <a className="public-secondary-action" href="/marketing/playdrama-china-impact.pptx" download>
-              <Download size={18} />
-              下载路演 PPT
-            </a>
-          </div>
-        </div>
-        <div className="public-hero-stage" aria-label="PlayDrama product preview">
-          <div className="public-poster-wall" aria-label="短剧项目样例">
-            {publicHeroPosters.map((item, index) => (
-              <article className="public-poster-card" key={item.title}>
-                <img src="/marketing/playdrama-hero.png" alt="" aria-hidden="true" />
-                <span>{String(index + 1).padStart(2, '0')}</span>
-                <div>
-                  <em>{item.tag}</em>
-                  <strong>{item.title}</strong>
-                  <small>{item.metric}</small>
-                </div>
-              </article>
-            ))}
-          </div>
-          <div className="public-product-preview" aria-label="创作工作台预览">
-            <div className="public-product-bar">
-              <span />
-              <span />
-              <span />
-              <strong>普通短剧创作平台</strong>
-            </div>
-            <div className="public-product-grid">
-              {[
-                ['01', '灵感策划', '一句话卖点'],
-                ['02', '故事梗概', '8 个剧情节点'],
-                ['03', '人物小传', '4 个角色资产'],
-                ['04', '分集大纲', '镜头脚本可导出'],
-              ].map(([index, label, detail]) => (
-                <article key={label}>
-                  <span>{index}</span>
-                  <strong>{label}</strong>
-                  <em>{detail}</em>
-                </article>
-              ))}
-            </div>
-            <div className="public-product-footer">
-              <span>互动分支</span>
-              <strong>付费结局 + 微信验收 + 数据回流</strong>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="public-signal-row" id="market" aria-label="Domestic market signals">
-        <div>
-          <span>微短剧用户规模</span>
-          <strong>6.96 亿</strong>
-        </div>
-        <div>
-          <span>2024 市场规模</span>
-          <strong>504.4 亿</strong>
-        </div>
-        <div>
-          <span>相关企业生态</span>
-          <strong>10 万+</strong>
-        </div>
-        <div>
-          <span>PlayDrama 状态</span>
-          <strong>17/17 通过</strong>
-        </div>
-      </section>
-
-      <section className="public-showcase" id="showcase" aria-labelledby="public-showcase-title">
-        <div className="public-section-copy">
-          <p className="public-section-label">样片证明</p>
-          <h2 id="public-showcase-title">先看到一部短剧，再决定要不要进工作台</h2>
-          <p>
-            PlayDrama 的入口要像真实短剧生产工具：样片、草稿、编辑和上线在同一条链路里，而不是只展示一堆功能名。
-          </p>
-        </div>
-        <div className="public-showcase-grid">
-          {publicShowcaseItems.map((item, index) => (
-            <a
-              className="public-showcase-card"
-              key={item.title}
-              href={`/studio?preview=1&sample=${item.sampleId}`}
-              aria-label={`试玩样片：${item.title}`}
-            >
-              <div className="public-showcase-media">
-                {item.media === 'video' ? (
-                  <video
-                    src="/marketing/playdrama-promo-20260522.mp4"
-                    poster="/marketing/playdrama-hero.png"
-                    muted
-                    playsInline
-                    preload="metadata"
-                  />
-                ) : (
-                  <img src="/marketing/playdrama-hero.png" alt={`${item.title} 样片画面`} />
-                )}
-                <span>{String(index + 1).padStart(2, '0')}</span>
-              </div>
-              <div className="public-showcase-body">
-                <small>{item.genre}</small>
-                <strong>{item.title}</strong>
-                <em>{item.stats}</em>
-                <p>{item.copy}</p>
-                <span className="public-showcase-cta">
-                  <Play size={16} fill="currentColor" />
-                  打开互动试玩
-                </span>
-              </div>
-            </a>
-          ))}
-        </div>
-        <div className="public-generator-path" aria-label="Short drama generation path">
-          {['写一句题材', 'AI 生成短剧草稿', '编辑分支和角色', '发布并复盘'].map((item) => (
-            <span key={item}>{item}</span>
-          ))}
-        </div>
-      </section>
-
-      <section className="public-video-band" aria-labelledby="public-video-title">
-        <div className="public-section-copy">
-          <p className="public-section-label">商业叙事</p>
-          <h2 id="public-video-title">给合作方看的 42 秒版本</h2>
-          <p>
-            这支预热视频说明了 PlayDrama 在国内短剧产业里的位置：不是单点生成工具，而是把生产、审核、发布、收款和数据回传连起来。
-          </p>
-        </div>
-        <video
-          className="public-video"
-          src="/marketing/playdrama-promo-20260522.mp4"
-          poster="/marketing/playdrama-hero.png"
-          controls
-          playsInline
-          preload="metadata"
-        >
-          <a href="/marketing/playdrama-promo-20260522.mp4">查看宣传视频</a>
-        </video>
-      </section>
-
-      <section className="public-workflow" id="workflow" aria-labelledby="public-workflow-title">
-        <div className="public-section-copy">
-          <p className="public-section-label">产品闭环</p>
-          <h2 id="public-workflow-title">互动短剧需要的是一条运营流水线</h2>
-        </div>
-        <div className="public-flow">
-          {[
-            { icon: GitBranch, title: '剧情图谱', copy: '节点、选择、变量、隐藏结局统一管理' },
-            { icon: Bot, title: 'AI 导演', copy: '用通义千问辅助扩写、补分支、查冲突' },
-            { icon: ShieldCheck, title: '合规门禁', copy: '内容安全、上线检查、商用配置一屏验收' },
-            { icon: Share2, title: '渠道分发', copy: 'H5、抖音、微信小程序路径同步准备' },
-            { icon: BarChart3, title: '变现复盘', copy: '付费结局、渠道参数、试玩事件回传' },
-          ].map((item) => {
-            const Icon = item.icon
-            return (
-              <article className="public-flow-item" key={item.title}>
-                <Icon size={22} />
-                <h3>{item.title}</h3>
-                <p>{item.copy}</p>
-              </article>
-            )
-          })}
-        </div>
-      </section>
-
-      <section className="public-impact" aria-labelledby="public-impact-title">
-        <div>
-          <p className="public-section-label">国内影响力</p>
-          <h2 id="public-impact-title">让中小团队也能进入互动内容工业化</h2>
-        </div>
-        <div className="public-impact-grid">
-          <article>
-            <Users size={22} />
-            <strong>短剧团队</strong>
-            <span>把 IP、剧本和分支变成可试玩版本</span>
-          </article>
-          <article>
-            <Clapperboard size={22} />
-            <strong>MCN 和服务商</strong>
-            <span>用标准流程交付更多垂类互动项目</span>
-          </article>
-          <article>
-            <QrCode size={22} />
-            <strong>文旅和品牌</strong>
-            <span>用剧情化体验做传播、获客和会员转化</span>
-          </article>
-        </div>
-      </section>
-
-      <section className="public-apply" id="apply" aria-labelledby="public-apply-title">
-        <div className="public-apply-copy">
-          <p className="public-section-label">内测合作</p>
-          <h2 id="public-apply-title">拿一个真实项目，跑一条完整链路</h2>
-          <p>
-            适合短剧制作团队、MCN、内容服务商、文旅项目和品牌互动营销团队。我们优先支持能提供真实故事样本的共创伙伴。
-          </p>
-          <ul>
-            <li>
-              <CheckCircle2 size={18} />
-              一部作品完成剧情图谱和 H5 试玩
-            </li>
-            <li>
-              <CheckCircle2 size={18} />
-              接入渠道参数、支付门槛和数据回传
-            </li>
-            <li>
-              <CheckCircle2 size={18} />
-              形成可复制的互动短剧上线方法
-            </li>
-          </ul>
-        </div>
-
-        <form className="public-lead-form" onSubmit={submitLead}>
-          <label>
-            <span>姓名</span>
-            <input
-              value={leadForm.name}
-              onChange={updateLeadField('name')}
-              placeholder="怎么称呼你"
-              required
-            />
-          </label>
-          <label>
-            <span>公司或团队</span>
-            <input
-              value={leadForm.company}
-              onChange={updateLeadField('company')}
-              placeholder="团队名称"
-            />
-          </label>
-          <label>
-            <span>角色</span>
-            <select value={leadForm.role} onChange={updateLeadField('role')}>
-              <option>短剧团队</option>
-              <option>MCN / 服务商</option>
-              <option>文旅项目</option>
-              <option>品牌营销</option>
-              <option>投资 / 渠道伙伴</option>
-            </select>
-          </label>
-          <div className="public-form-grid">
-            <label>
-              <span>手机号</span>
-              <input
-                value={leadForm.phone}
-                onChange={updateLeadField('phone')}
-                placeholder="用于联系"
-                inputMode="tel"
-              />
-            </label>
-            <label>
-              <span>邮箱</span>
-              <input
-                value={leadForm.email}
-                onChange={updateLeadField('email')}
-                placeholder="选填"
-                type="email"
-              />
-            </label>
-          </div>
-          <label>
-            <span>想验证什么</span>
-            <select value={leadForm.scenario} onChange={updateLeadField('scenario')}>
-              <option>互动短剧内测</option>
-              <option>抖音 / 微信小程序上线</option>
-              <option>付费结局和数据复盘</option>
-              <option>短剧服务商解决方案</option>
-            </select>
-          </label>
-          <label>
-            <span>补充说明</span>
-            <textarea
-              value={leadForm.message}
-              onChange={updateLeadField('message')}
-              placeholder="已有故事、账号、预算或上线时间，可以写在这里"
-              rows={4}
-            />
-          </label>
-          <button className="public-submit" type="submit" disabled={leadState === 'submitting'}>
-            {leadState === 'submitting' ? '提交中' : '提交内测申请'}
-          </button>
-          <p className={`public-form-state ${leadState}`}>{leadMessage}</p>
-        </form>
-      </section>
-    </main>
-  )
-}
-
-function App() {
-  const params = new URLSearchParams(window.location.search)
-  const pathname = window.location.pathname
-  const shouldOpenStudio =
-    pathname.startsWith('/studio') ||
-    params.get('preview') === '1' ||
-    Boolean(params.get('build')) ||
-    Boolean(params.get('sample')) ||
-    Boolean(params.get('invite'))
-
-  return shouldOpenStudio ? <StudioApp /> : <PublicLandingPage />
-}
+function App() { return <StudioApp /> }
 
 function loadInitialStudioPage(): StudioPage {
+  const hashPage = readStudioPageFromHash()
+  if (hashPage) return hashPage
+
   const params = new URLSearchParams(window.location.search)
   const requestedPage = params.get('page')
   if (studioPageIds.includes(requestedPage as StudioPage)) {
@@ -2897,6 +2735,7 @@ function loadInitialStudioPage(): StudioPage {
 }
 
 function StudioApp() {
+  const { toggleTheme, resolvedTheme } = useTheme()
   const [project, setProject] = useState<StoryProject>(() => loadStoredProject())
   const [previewOnly, setPreviewOnly] = useState(() =>
     new URLSearchParams(window.location.search).get('preview') === '1' ||
@@ -2913,17 +2752,57 @@ function StudioApp() {
   )
   const [runtimePath, setRuntimePath] = useState(() => [project.nodes[0].id])
   const [runtimeMessage, setRuntimeMessage] = useState('试玩已准备')
-  const [activeStudioPage, setActiveStudioPage] = useState<StudioPage>(() =>
+  const [activeStudioPage, setActiveStudioPageState] = useState<StudioPage>(() =>
     loadInitialStudioPage(),
   )
+  const [showStudioMoreTools, setShowStudioMoreTools] = useState(false)
+  const [libtvDrawerTab, setLibtvDrawerTab] = useState<LibtvCanvasDrawerTab>('node')
+  const [showLibtvAddMenu, setShowLibtvAddMenu] = useState(false)
+  const [showLibtvDetailPanel, setShowLibtvDetailPanel] = useState(false)
+  const [nodeRunRecords, setNodeRunRecords] = useState<Record<string, NodeRunRecord>>({})
+  const [canvasAssets, setCanvasAssets] = useState<CanvasAsset[]>([])
+  const [workflowRunState, setWorkflowRunState] = useState('工作流待运行')
+  const assetUploadInputRef = useRef<HTMLInputElement | null>(null)
+  const [storyCanvasZoom, setStoryCanvasZoom] = useState(1)
+  const [storyCanvasPan, setStoryCanvasPan] = useState({ x: 0, y: 0 })
+  const [storyCanvasNodePositions, setStoryCanvasNodePositions] = useState<
+    Record<string, { x: number; y: number }>
+  >({})
+  const [storyEdgeDraftSourceId, setStoryEdgeDraftSourceId] = useState<string | null>(null)
+  const [storyCanvasDrag, setStoryCanvasDrag] = useState<
+    | {
+        kind: 'node'
+        nodeId: string
+        startX: number
+        startY: number
+        originX: number
+        originY: number
+      }
+    | {
+        kind: 'pan'
+        startX: number
+        startY: number
+        originX: number
+        originY: number
+      }
+    | null
+  >(null)
+  const setActiveStudioPage = useCallback((page: StudioPage) => {
+    setActiveStudioPageState(page)
+    const nextHash = formatStudioHash(page)
+    if (window.location.hash !== nextHash) {
+      window.history.pushState({}, '', `${window.location.pathname}${window.location.search}${nextHash}`)
+    }
+  }, [])
   const [activeCreationStage, setActiveCreationStage] =
     useState<CreationStageId>('inspiration')
   const [searchQuery, setSearchQuery] = useState('')
+  const [showStudioQuickCreate, setShowStudioQuickCreate] = useState(false)
   const [saveState, setSaveState] = useState('已同步本地草稿')
   const [buildState, setBuildState] = useState('等待生成发布包')
   const [aiState, setAiState] = useState('AI 可生成下一幕')
   const [seriesGenerator, setSeriesGenerator] = useState<SeriesGeneratorInput>({
-    idea: '医院午夜来电，女主发现每次选择都会改写当天热搜',
+    idea: loadStoredQuickPrompt('医院午夜来电，女主发现每次选择都会改写当天热搜'),
     genre: '悬疑反转',
     audience: '18-35 岁短剧用户',
     platform: '抖音 / 微信小程序',
@@ -2933,12 +2812,17 @@ function StudioApp() {
     constraints: '避免血腥细节，免费线要完整，付费结局提供更强反转',
   })
   const [beginnerIdea, setBeginnerIdea] =
-    useState('普通女孩发现自己每次刷到同一条短视频，现实都会跟着改写')
+    useState(() => loadStoredQuickPrompt('普通女孩发现自己每次刷到同一条短视频，现实都会跟着改写'))
+  const [studioQuickPrompt, setStudioQuickPrompt] = useState(() =>
+    loadStoredQuickPrompt('普通女孩发现自己每次刷到同一条短视频，现实都会跟着改写'),
+  )
   const [beginnerGenre, setBeginnerGenre] = useState('悬疑反转')
   const [beginnerLength, setBeginnerLength] = useState('3 分钟 / 6 集')
   const [beginnerGoal, setBeginnerGoal] = useState<BeginnerCreationGoal>('paid')
   const [beginnerCreationState, setBeginnerCreationState] =
     useState('一句话就能开始，系统会自动补创作表单')
+  const [interactiveQuickState, setInteractiveQuickState] =
+    useState('一句话生成互动短剧，自动补节点、选择、免费结局和付费隐藏线')
   const [seriesGenerationState, setSeriesGenerationState] =
     useState('填写 brief 后生成完整短剧草稿')
   const [seriesGenerationJob, setSeriesGenerationJob] =
@@ -3036,6 +2920,18 @@ function StudioApp() {
   useEffect(() => {
     activeProjectIdRef.current = project.id
   }, [project.id])
+  useEffect(() => {
+    const syncPageFromUrl = () => {
+      const page = loadInitialStudioPage()
+      setActiveStudioPageState(page)
+    }
+    window.addEventListener('hashchange', syncPageFromUrl)
+    window.addEventListener('popstate', syncPageFromUrl)
+    return () => {
+      window.removeEventListener('hashchange', syncPageFromUrl)
+      window.removeEventListener('popstate', syncPageFromUrl)
+    }
+  }, [])
   const authProviderId = authProvider?.provider ?? ''
   const isNetlifyIdentityAuth = authProviderId === 'netlify-identity'
   const isEmailCodeAuth = authProviderId === 'email-code'
@@ -3417,6 +3313,214 @@ function StudioApp() {
           ? `下一步 ${node.choices[0].targetNodeId}`
           : '断点',
   }))
+  const storyCanvasNodeWidth = 212
+  const storyCanvasNodeHeight = 148
+  const storyCanvasDefaultPositions = useMemo(() => {
+    const positions: Record<string, { x: number; y: number }> = {}
+    storyNodes.forEach((node, index) => {
+      const lane = index % 3
+      positions[node.id] = {
+        x: 40 + index * 246,
+        y: lane === 0 ? 146 : lane === 1 ? 64 : 224,
+      }
+    })
+    return positions
+  }, [storyNodes])
+  const storyCanvasNodes = useMemo(
+    () =>
+      storyNodes.map((node, index) => {
+        const position =
+          storyCanvasNodePositions[node.id] ||
+          project.canvasLayout?.nodePositions?.[node.id] ||
+          storyCanvasDefaultPositions[node.id] ||
+          {
+            x: 40 + index * 246,
+            y: 146,
+          }
+
+        return {
+          node,
+          index,
+          x: position.x,
+          y: position.y,
+          diagnostic: storyDiagnosticByNodeId.get(node.id),
+        }
+      }),
+    [
+      project.canvasLayout?.nodePositions,
+      storyCanvasDefaultPositions,
+      storyCanvasNodePositions,
+      storyDiagnosticByNodeId,
+      storyNodes,
+    ],
+  )
+  const storyCanvasNodeById = useMemo(
+    () => new Map(storyCanvasNodes.map((item) => [item.node.id, item])),
+    [storyCanvasNodes],
+  )
+  const storyCanvasEdges = useMemo(
+    () =>
+      storyNodes.flatMap((node) => {
+        const source = storyCanvasNodeById.get(node.id)
+        if (!source) return []
+
+        return node.choices.flatMap((choiceItem) => {
+            const target = storyCanvasNodeById.get(choiceItem.targetNodeId)
+            if (!target) return []
+
+            const sourceX = source.x + storyCanvasNodeWidth
+            const sourceY = source.y + storyCanvasNodeHeight / 2
+            const targetX = target.x
+            const targetY = target.y + storyCanvasNodeHeight / 2
+            const midX = sourceX + Math.max(80, (targetX - sourceX) / 2)
+            const targetPaywall = getNodePaywallMode(
+              project,
+              target.node,
+              endingNodeIndexById.get(target.node.id) || 0,
+            )
+
+            return [{
+              id: `${node.id}-${choiceItem.id}-${choiceItem.targetNodeId}`,
+              label: choiceItem.label || '选择',
+              sourceId: node.id,
+              targetId: choiceItem.targetNodeId,
+              tone:
+                targetPaywall === 'paid'
+                  ? 'paid'
+                  : choiceItem.condition.trim()
+                    ? 'conditional'
+                    : 'normal',
+              path: `M ${sourceX} ${sourceY} C ${midX} ${sourceY}, ${midX} ${targetY}, ${targetX} ${targetY}`,
+              labelX: (sourceX + targetX) / 2,
+              labelY: (sourceY + targetY) / 2,
+            }]
+          })
+      }),
+    [endingNodeIndexById, project, storyCanvasNodeById, storyNodes],
+  )
+  const storyCanvasSize = useMemo(() => {
+    const maxX = storyCanvasNodes.reduce(
+      (value, item) => Math.max(value, item.x + storyCanvasNodeWidth + 72),
+      980,
+    )
+    const maxY = storyCanvasNodes.reduce(
+      (value, item) => Math.max(value, item.y + storyCanvasNodeHeight + 72),
+      500,
+    )
+
+    return { width: maxX, height: maxY }
+  }, [storyCanvasNodes])
+  const updateStoryCanvasZoom = useCallback((delta: number) => {
+    setStoryCanvasZoom((current) => Math.min(1.45, Math.max(0.68, Number((current + delta).toFixed(2)))))
+  }, [])
+  const persistStoryCanvasNodePosition = useCallback((nodeId: string, position: { x: number; y: number }) => {
+    updateProject((current) => ({
+      ...current,
+      canvasLayout: {
+        ...current.canvasLayout,
+        nodePositions: {
+          ...(current.canvasLayout?.nodePositions || {}),
+          [nodeId]: position,
+        },
+      },
+    }))
+  }, [])
+  const resetStoryCanvasView = useCallback(() => {
+    setStoryCanvasZoom(1)
+    setStoryCanvasPan({ x: 0, y: 0 })
+    setStoryCanvasNodePositions({})
+    updateProject((current) => ({
+      ...current,
+      canvasLayout: {
+        ...current.canvasLayout,
+        nodePositions: {},
+      },
+    }))
+  }, [])
+  const startStoryCanvasPan = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0) return
+      if ((event.target as HTMLElement).closest('button, input, textarea, select, a')) return
+      setStoryCanvasDrag({
+        kind: 'pan',
+        startX: event.clientX,
+        startY: event.clientY,
+        originX: storyCanvasPan.x,
+        originY: storyCanvasPan.y,
+      })
+    },
+    [storyCanvasPan.x, storyCanvasPan.y],
+  )
+  const startStoryNodeDrag = useCallback(
+    (event: ReactPointerEvent<HTMLButtonElement>, nodeId: string) => {
+      if (event.button !== 0) return
+      const canvasNode = storyCanvasNodeById.get(nodeId)
+      if (!canvasNode) return
+      event.preventDefault()
+      event.stopPropagation()
+      setSelectedNodeId(nodeId)
+      setLibtvDrawerTab('node')
+      setStoryCanvasDrag({
+        kind: 'node',
+        nodeId,
+        startX: event.clientX,
+        startY: event.clientY,
+        originX: canvasNode.x,
+        originY: canvasNode.y,
+      })
+    },
+    [storyCanvasNodeById],
+  )
+  const handleStoryCanvasWheel = useCallback((event: ReactWheelEvent<HTMLDivElement>) => {
+    if (!event.ctrlKey && !event.metaKey) return
+    event.preventDefault()
+    updateStoryCanvasZoom(event.deltaY > 0 ? -0.08 : 0.08)
+  }, [updateStoryCanvasZoom])
+  useEffect(() => {
+    if (!storyCanvasDrag) return
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const deltaX = event.clientX - storyCanvasDrag.startX
+      const deltaY = event.clientY - storyCanvasDrag.startY
+
+      if (storyCanvasDrag.kind === 'pan') {
+        setStoryCanvasPan({
+          x: storyCanvasDrag.originX + deltaX,
+          y: storyCanvasDrag.originY + deltaY,
+        })
+        return
+      }
+
+      setStoryCanvasNodePositions((current) => ({
+        ...current,
+        [storyCanvasDrag.nodeId]: {
+          x: Math.max(16, storyCanvasDrag.originX + deltaX / storyCanvasZoom),
+          y: Math.max(16, storyCanvasDrag.originY + deltaY / storyCanvasZoom),
+        },
+      }))
+    }
+    const handlePointerUp = (event: PointerEvent) => {
+      if (storyCanvasDrag.kind === 'node') {
+        const deltaX = event.clientX - storyCanvasDrag.startX
+        const deltaY = event.clientY - storyCanvasDrag.startY
+        const position = {
+          x: Math.max(16, storyCanvasDrag.originX + deltaX / storyCanvasZoom),
+          y: Math.max(16, storyCanvasDrag.originY + deltaY / storyCanvasZoom),
+        }
+        persistStoryCanvasNodePosition(storyCanvasDrag.nodeId, position)
+      }
+      setStoryCanvasDrag(null)
+    }
+
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp)
+    window.addEventListener('pointercancel', handlePointerUp)
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+      window.removeEventListener('pointercancel', handlePointerUp)
+    }
+  }, [persistStoryCanvasNodePosition, storyCanvasDrag, storyCanvasZoom])
   const branchConditionTemplates = project.variables.slice(0, 4).map(buildConditionTemplate)
   const selectedNodePaywallMode = getNodePaywallMode(
     project,
@@ -3486,6 +3590,62 @@ function StudioApp() {
       status,
     }
   })
+  const selectedLibtvNodeType = getLibtvNodeType(selectedNode)
+  const selectedNodeRunRecord = nodeRunRecords[selectedNode.id] || {
+    status: 'idle' as const,
+    progress: 0,
+    message: '等待运行',
+    outputTitle: '暂无输出',
+    outputPreview: '点击运行节点后，这里会生成可复用结果。',
+    updatedAt: '',
+    credits: 0,
+  }
+  const nodeExecutionRows = storyNodes.map((node) => {
+    const record = nodeRunRecords[node.id]
+    return {
+      id: node.id,
+      title: node.title,
+      type: getLibtvNodeType(node),
+      status: record?.status || 'idle',
+      progress: record?.progress || 0,
+      message: record?.message || '等待运行',
+    }
+  })
+  const canvasNodeCreditsUsed = Object.values(nodeRunRecords).reduce(
+    (total, record) => total + (record.status === 'succeeded' ? record.credits : 0),
+    0,
+  )
+  const workflowCompletedCount = nodeExecutionRows.filter((row) => row.status === 'succeeded').length
+  const workflowRunningCount = nodeExecutionRows.filter(
+    (row) => row.status === 'queued' || row.status === 'running',
+  ).length
+  const selectedNodeParameterRows = [
+    {
+      label: '模型',
+      value: selectedNode.model || libtvNodeTypeModels[selectedLibtvNodeType],
+    },
+    {
+      label: '输入',
+      value:
+        selectedNode.prompt ||
+        selectedNode.summary ||
+        beginnerIdea ||
+        '从一句话想法、上游节点或素材库输入',
+    },
+    {
+      label: '输出',
+      value:
+        selectedLibtvNodeType === 'image'
+          ? '角色图、海报或分镜参考'
+          : selectedLibtvNodeType === 'video'
+            ? '镜头视频、运动提示和预览链接'
+            : selectedLibtvNodeType === 'audio'
+              ? '音色、旁白、BGM 和音效建议'
+              : selectedLibtvNodeType === 'composite'
+                ? '成片合成清单和导出规格'
+                : '剧本正文、选择文案和可执行 Prompt',
+    },
+  ]
   const storyHealthCards = [
     {
       label: '剧情节点',
@@ -4940,6 +5100,7 @@ function StudioApp() {
   const generationCreditTotal = 20
   const generationCreditsUsed = Math.min(generationCreditTotal, generationUsageEvents.length)
   const generationCreditsRemaining = Math.max(0, generationCreditTotal - generationCreditsUsed)
+  const canvasCreditsRemaining = Math.max(0, generationCreditsRemaining - canvasNodeCreditsUsed)
   const aiModelLabel =
     aiProvider?.model ||
     aiProvider?.providers.find((provider) => provider.id === aiProvider.provider)?.defaultModel ||
@@ -5868,6 +6029,85 @@ function StudioApp() {
       },
     },
   ]
+  const studioQuickModes = [
+    {
+      id: 'interactive',
+      title: '互动短剧',
+      detail: '剧情图谱、选择分支、付费结局和发布验收',
+      badge: '核心能力',
+      icon: <GitBranch size={18} />,
+      page: 'story' as StudioPage,
+      cta: '进入互动编辑',
+    },
+    {
+      id: 'script',
+      title: '文生短剧',
+      detail: '一句话生成梗概、人物、分集和正文',
+      badge: 'Seedrama',
+      icon: <Wand2 size={18} />,
+      page: 'creation' as StudioPage,
+      cta: '进入创作模式',
+    },
+    {
+      id: 'video',
+      title: '视频生成',
+      detail: '把镜头送入视频生成队列，审片后交付',
+      badge: `${videoShotPipelineRows.length || visibleGeneratedReview?.storyboardShots.length || 15} 镜头`,
+      icon: <Clapperboard size={18} />,
+      page: 'video' as StudioPage,
+      cta: '看视频队列',
+    },
+    {
+      id: 'storyboard',
+      title: '分镜设计',
+      detail: '快速查看镜头、Prompt、角色参考和审片状态',
+      badge: '镜头表',
+      icon: <Grid3x3 size={18} />,
+      page: 'storyboard' as StudioPage,
+      cta: '打开分镜',
+    },
+    {
+      id: 'publish',
+      title: '发布验收',
+      detail: '生成发布包、付款验证、渠道数据回流',
+      badge: paymentProviderReady ? '通道可用' : '待配置',
+      icon: <Rocket size={18} />,
+      page: 'publish' as StudioPage,
+      cta: '去发布',
+    },
+  ]
+  const studioQuickPromptPresets = [
+    '普通女孩发现自己每次刷到同一条短视频，现实都会跟着改写',
+    '外卖员接到午夜医院订单，每个选择都会解锁一个付费结局',
+    '实习医生发现第七通电话来自未来，观众决定她救谁',
+  ]
+
+  function applyStudioQuickPrompt() {
+    const nextPrompt = studioQuickPrompt.trim()
+    if (!nextPrompt) return ''
+    setBeginnerIdea(nextPrompt)
+    setSeriesGenerator((current) => ({ ...current, idea: nextPrompt }))
+    writeStoredValue(QUICK_PROMPT_STORAGE_KEY, nextPrompt)
+    return nextPrompt
+  }
+
+  function launchStudioQuickMode(page: StudioPage) {
+    const nextPrompt = applyStudioQuickPrompt()
+    if (page === 'creation') setActiveCreationStage('inspiration')
+    if (page === 'story' && nextPrompt) {
+      setRuntimeMessage(`已载入创意：${truncateProductionText(nextPrompt, '创意', 24)}`)
+    }
+    setActiveStudioPage(page)
+    setShowStudioQuickCreate(false)
+  }
+
+  function runStudioQuickExperience() {
+    applyStudioQuickPrompt()
+    setActiveCreationStage('inspiration')
+    setShowStudioQuickCreate(false)
+    void generateBeginnerShortDrama()
+  }
+
   const paymentOperationsKpis = [
     {
       label: '回调验签',
@@ -6029,6 +6269,287 @@ function StudioApp() {
     { step: '02', title: '自动补表单', detail: `${beginnerGenre} · ${beginnerLength}` },
     { step: '03', title: '生成草稿', detail: selectedBeginnerGoal.detail },
     { step: '04', title: '继续交付', detail: '细修、导出、升级互动、发布收款' },
+  ]
+  const interactiveQuickRows = [
+    {
+      label: '互动节点',
+      value: '5 个',
+      note: '开场、选择、线索、免费结局、隐藏结局',
+      tone: 'ready',
+    },
+    {
+      label: '选择分支',
+      value: '6 条',
+      note: selectedBeginnerGoal.density,
+      tone: 'ready',
+    },
+    {
+      label: '变现',
+      value: formatMonetization(beginnerSeriesInput.monetization),
+      note: beginnerSeriesInput.monetization === 'Paid Ending' ? `试卖价 CNY ${selectedBeginnerGoal.price}` : '免费试玩',
+      tone: beginnerSeriesInput.monetization === 'Paid Ending' ? 'paid' : 'ready',
+    },
+    {
+      label: '生成后',
+      value: '直接试玩',
+      note: '自动打开互动图谱和可玩预览',
+      tone: 'ready',
+    },
+  ]
+  const libtvCanvasEntryCards = [
+    {
+      id: 'story-script',
+      title: '故事脚本生成',
+      detail: '从一句 brief 生成完整故事脚本，普通短剧和互动短剧共用入口',
+      icon: <FileText size={18} />,
+      action: () => void generateCanvasShortDramaProject(),
+      cta: '生成脚本节点',
+      tone: 'primary',
+    },
+    {
+      id: 'character-assets',
+      title: '角色三视图',
+      detail: '从人物设定延展角色三视图、口吻、服装和资产标签',
+      icon: <Users size={18} />,
+      action: () => setActiveStudioPage('characters'),
+      cta: '生成角色资产',
+      tone: 'accent',
+    },
+    {
+      id: 'first-frame-video',
+      title: '首帧图生视频',
+      detail: '把分镜首帧、镜头运动、台词和视频队列连成一条线',
+      icon: <Video size={18} />,
+      action: () => setActiveStudioPage('video'),
+      cta: '进入视频队列',
+      tone: 'media',
+    },
+    {
+      id: 'audio-video',
+      title: '音频生视频',
+      detail: '旁白、BGM、音效和互动节点节奏一起进入成片提示词',
+      icon: <Megaphone size={18} />,
+      action: () => addTypedCanvasNode('audio'),
+      cta: '添加音频节点',
+      tone: 'publish',
+    },
+  ]
+  const runLibtvAddNodeAction = (action: () => void) => {
+    action()
+    setShowLibtvAddMenu(false)
+  }
+  const libtvAddNodeRows = [
+    { section: 'node', label: '文本', detail: '剧本、对白、旁白', icon: <FileText size={16} />, action: () => addTypedCanvasNode('text') },
+    {
+      section: 'node',
+      label: '图片',
+      detail: '角色图、海报、分镜',
+      icon: <Layers3 size={16} />,
+      action: () => addTypedCanvasNode('image'),
+    },
+    {
+      section: 'node',
+      label: '视频',
+      detail: '镜头、动画、成片',
+      icon: <Video size={16} />,
+      action: () => addTypedCanvasNode('video'),
+    },
+    {
+      section: 'node',
+      label: '视频合成',
+      detail: '多个片段合成一个成片',
+      icon: <Clapperboard size={16} />,
+      tag: 'Beta',
+      action: () => addTypedCanvasNode('composite'),
+    },
+    {
+      section: 'node',
+      label: '导演台',
+      detail: '镜头构图、场景和机位参考',
+      icon: <Grid3x3 size={16} />,
+      tag: 'NEW',
+      action: () => addTypedCanvasNode('director'),
+    },
+    {
+      section: 'node',
+      label: '音频',
+      detail: '音效、配音、音乐',
+      icon: <Megaphone size={16} />,
+      action: () => addTypedCanvasNode('audio'),
+    },
+    {
+      section: 'node',
+      label: '脚本',
+      detail: '普通短剧脚本和生产包',
+      icon: <Sparkles size={16} />,
+      action: () => addTypedCanvasNode('script'),
+    },
+    {
+      section: 'node',
+      label: '素材库',
+      detail: '角色、分镜、视频素材',
+      icon: <Layers3 size={16} />,
+      tag: 'NEW',
+      action: () => setLibtvDrawerTab('assets'),
+    },
+    {
+      section: 'resource',
+      label: '上传',
+      detail: '导入图片、音频、视频',
+      icon: <Upload size={16} />,
+      action: () => assetUploadInputRef.current?.click(),
+    },
+    {
+      section: 'resource',
+      label: '从生成历史选择',
+      detail: '复用历史脚本和素材',
+      icon: <RotateCcw size={16} />,
+      action: () => setLibtvDrawerTab('history'),
+    },
+  ]
+  const libtvToolboxRows = [
+    {
+      title: '运行当前节点',
+      meta: `${selectedNode.id} · ${libtvNodeTypeLabels[selectedLibtvNodeType]}`,
+      state: selectedNodeRunRecord.message,
+      actionLabel: selectedNodeRunRecord.status === 'running' ? '运行中' : '运行',
+      action: () => void runCanvasNode(selectedNode.id),
+    },
+    {
+      title: '批量运行画布',
+      meta: `${storyNodes.length} 节点 · ${workflowCompletedCount}/${storyNodes.length} 完成`,
+      state: workflowRunState,
+      actionLabel: workflowRunningCount > 0 ? '运行中' : '运行',
+      action: () => void runCanvasWorkflow(),
+    },
+    {
+      title: '互动短剧一键生成',
+      meta: '一句话到节点、选择和付费线',
+      state: interactiveQuickState,
+      actionLabel: '生成',
+      action: () => void generateInteractiveShortDramaProject(),
+    },
+    {
+      title: '普通短剧生成',
+      meta: `${beginnerGenre} · ${beginnerLength}`,
+      state: seriesGenerationState,
+      actionLabel: '生成',
+      action: () => void generateCanvasShortDramaProject(),
+    },
+    {
+      title: '导演分镜',
+      meta: visibleGeneratedReview ? `${visibleGeneratedReview.shotCount} 镜` : `${storyNodes.length} 节点可拆镜`,
+      state: '生成镜头、台词和视频 Prompt',
+      actionLabel: '分镜',
+      action: () => setActiveStudioPage('storyboard'),
+    },
+    {
+      title: '发布收款',
+      meta: publishedBuildId ? `发布包 #${publishedBuildId.slice(-6)}` : '待生成发布包',
+      state: buildState,
+      actionLabel: '发布',
+      action: () => setActiveStudioPage('publish'),
+    },
+  ]
+  const libtvWorkbenchStats = [
+    { label: '画布节点', value: `${storyNodes.length}`, note: `${connectionCount} 条连线` },
+    { label: '运行状态', value: `${workflowCompletedCount}/${storyNodes.length}`, note: workflowRunState },
+    { label: '资产', value: `${canvasAssets.length}`, note: '可复用到节点' },
+    { label: '发布状态', value: publishedBuildId ? '已发布' : '未发布', note: buildState },
+  ]
+  const libtvRuntimeAssetRows = canvasAssets.map((asset) => ({
+    title: asset.name,
+    meta: asset.meta,
+    state: asset.source,
+    actionLabel: '复用',
+    action: () => applyCanvasAssetToSelectedNode(asset),
+  }))
+  const libtvAssetRows = [
+    ...libtvRuntimeAssetRows,
+    {
+      title: '剧本节点',
+      meta: `${storyNodes.length} 个`,
+      state: '已在画布',
+      actionLabel: '定位',
+      action: () => focusStoryNode(storyNodes[0]?.id || selectedNode.id, '已定位主线入口'),
+    },
+    {
+      title: '分支选择',
+      meta: `${connectionCount} 条`,
+      state: '可编辑',
+      actionLabel: '连线',
+      action: () => startCanvasEdgeDraft(selectedNode.id),
+    },
+    {
+      title: '视频脚本',
+      meta: `${visibleGeneratedReview?.videoQueueCount || storyNodes.length} 条`,
+      state: '可生成',
+      actionLabel: '视频',
+      action: () => setActiveStudioPage('video'),
+    },
+    {
+      title: '发布包',
+      meta: publishedBuildId ? `#${publishedBuildId.slice(-6)}` : '待生成',
+      state: publishedBuildId ? '可分享' : '待发布',
+      actionLabel: '发布',
+      action: () => setActiveStudioPage('publish'),
+    },
+  ]
+  const libtvHistoryRows = [
+    {
+      title: '最近生成',
+      meta: selectedNodeRunRecord.status === 'succeeded'
+        ? selectedNodeRunRecord.outputTitle
+        : visibleGeneratedReview
+          ? `${visibleGeneratedReview.nodeCount} 节点`
+          : '暂无生产包',
+      state: selectedNodeRunRecord.status === 'succeeded'
+        ? selectedNodeRunRecord.outputPreview
+        : visibleGeneratedReview
+          ? '可继续细修或导出'
+          : '点击开始创作生成第一版',
+      actionLabel: selectedNodeRunRecord.status === 'succeeded' ? '回填' : visibleGeneratedReview ? '复用' : '生成',
+      action: () => {
+        if (selectedNodeRunRecord.status === 'succeeded') {
+          updateSelectedNode('prompt', selectedNodeRunRecord.outputPreview)
+          setLibtvDrawerTab('node')
+          setRuntimeMessage(`已把最近输出回填到 ${selectedNode.id}`)
+          return
+        }
+        if (visibleGeneratedReview) {
+          setLibtvDrawerTab('node')
+          openGeneratedRefinement()
+          return
+        }
+        void generateCanvasShortDramaProject()
+      },
+    },
+    {
+      title: '视频任务',
+      meta: `${videoJobSummary.total} 条`,
+      state:
+        videoJobSummary.running > 0
+          ? `${videoJobSummary.running} 条运行中`
+          : videoJobSummary.succeeded > 0
+            ? `${videoJobSummary.succeeded} 条已完成`
+            : videoGenerationState,
+      actionLabel: '打开',
+      action: () => setActiveStudioPage('video'),
+    },
+    {
+      title: '发布版本',
+      meta: publishBuilds.length ? `${publishBuilds.length} 个版本` : '暂无版本',
+      state: publishedBuildId ? `当前 #${publishedBuildId.slice(-6)}` : buildState,
+      actionLabel: '发布',
+      action: () => setActiveStudioPage('publish'),
+    },
+    {
+      title: '操作记录',
+      meta: auditEntries.length ? `${auditEntries.length} 条` : '暂无记录',
+      state: auditEntries.length ? '保存、发布和邀请记录会在这里回看' : '开始协作后自动沉淀',
+      actionLabel: '刷新',
+      action: () => void refreshTeamState(activeWorkspaceId),
+    },
   ]
   const beginnerHandoffReady = Boolean(visibleGeneratedReview)
   const beginnerPublishedReady = Boolean(publishedBuildId)
@@ -6813,6 +7334,9 @@ function StudioApp() {
     setRuntimeState(createRuntimeState(nextProject.variables))
     setRuntimePath([nextProject.nodes[0].id])
     setRuntimeMessage(message)
+    setNodeRunRecords({})
+    setCanvasAssets([])
+    setWorkflowRunState('工作流待运行')
     writeStoredValue(STORAGE_KEY, JSON.stringify(nextProject))
   }, [])
 
@@ -7084,6 +7608,55 @@ function StudioApp() {
       cancelled = true
     }
   }, [authProviderId, hasWorkspaceSession, isExternalProviderAuth, previewBuildId, project.id, projectHasRemoteRecord])
+
+  useEffect(() => {
+    if (previewBuildId || !project.id) return
+    if (!projectHasRemoteRecord) {
+      const timer = window.setTimeout(() => {
+        setCanvasAssets([])
+        setNodeRunRecords({})
+        setWorkflowRunState('保存后加载画布运行记录')
+      }, 0)
+      return () => window.clearTimeout(timer)
+    }
+    if (isExternalProviderAuth && !hasWorkspaceSession) {
+      const timer = window.setTimeout(() => {
+        setCanvasAssets([])
+        setNodeRunRecords({})
+        setWorkflowRunState('登录后加载画布运行记录')
+      }, 0)
+      return () => window.clearTimeout(timer)
+    }
+
+    let cancelled = false
+
+    async function loadCanvasRuntime() {
+      try {
+        const [assets, runs] = await Promise.all([
+          fetchCanvasAssets<CanvasAsset>(project.id),
+          fetchCanvasNodeRuns<NodeRunRecord>(project.id),
+        ])
+        if (cancelled) return
+        setCanvasAssets(assets.slice(0, 24))
+        setNodeRunRecords(
+          runs.reduce<Record<string, NodeRunRecord>>((records, run) => {
+            if (run.nodeId && !records[run.nodeId]) records[run.nodeId] = run
+            return records
+          }, {}),
+        )
+        setWorkflowRunState(runs.length > 0 ? `已加载 ${runs.length} 条节点运行记录` : '工作流待运行')
+      } catch (error) {
+        logError('api', error)
+        if (!cancelled) setWorkflowRunState('画布运行记录暂不可用')
+      }
+    }
+
+    void loadCanvasRuntime()
+
+    return () => {
+      cancelled = true
+    }
+  }, [hasWorkspaceSession, isExternalProviderAuth, previewBuildId, project.id, projectHasRemoteRecord])
 
   useEffect(() => {
     if (previewBuildId || !project.id || !projectHasRemoteRecord) return
@@ -7781,6 +8354,67 @@ function StudioApp() {
 
   async function generateShortDramaProject() {
     await runShortDramaGeneration(seriesGenerator)
+  }
+
+  async function generateCanvasShortDramaProject() {
+    setLibtvDrawerTab('history')
+    setShowLibtvAddMenu(false)
+    setShowLibtvDetailPanel(false)
+    setSeriesGenerationState('正在从画布生成普通短剧生产包')
+    const succeeded = await runShortDramaGeneration(beginnerSeriesInput)
+    if (succeeded) {
+      setActiveStudioPage('story')
+      setLibtvDrawerTab('history')
+      setSeriesGenerationState('普通短剧生产包已生成，可继续转互动、分镜或发布')
+    }
+  }
+
+  async function generateInteractiveShortDramaProject() {
+    const interactiveInput: SeriesGeneratorInput = {
+      ...beginnerSeriesInput,
+      interactionDensity:
+        beginnerGoal === 'normal' ? '关键转折点选择' : selectedBeginnerGoal.density,
+      constraints: [
+        selectedBeginnerGoal.constraints,
+        '直接生成可试玩互动短剧，不先进入专业表单。',
+        '必须包含免费完整结局和一个更强反转的隐藏结局。',
+      ].join(' '),
+    }
+
+    setInteractiveQuickState('正在生成互动短剧，系统会自动补节点、选择和隐藏结局')
+    setLibtvDrawerTab('history')
+    setShowLibtvAddMenu(false)
+    setShowLibtvDetailPanel(false)
+    setSeriesGenerator(interactiveInput)
+    writeStoredValue(QUICK_PROMPT_STORAGE_KEY, interactiveInput.idea)
+
+    const draftProject = buildQuickInteractiveProject(interactiveInput, project)
+    applyProject(draftProject, `已一键生成 ${draftProject.nodes.length} 个互动节点，可直接试玩`)
+    setSelectedNodeId(draftProject.nodes[0].id)
+    setRuntimeNodeId(draftProject.nodes[0].id)
+    setRuntimePath([draftProject.nodes[0].id])
+    setRuntimeState(createRuntimeState(draftProject.variables))
+    setStoryCanvasNodePositions(draftProject.canvasLayout?.nodePositions || {})
+    setStoryCanvasZoom(0.92)
+    setStoryCanvasPan({ x: 0, y: 0 })
+    setStoryEdgeDraftSourceId(null)
+    setSearchQuery('')
+    setPublishedBuildId('')
+    setPaymentOrders([])
+    setPaymentLedgerOrders([])
+    setPendingPaidChoice(null)
+    setBuildState('互动草稿已生成，发布前请保存发布包')
+    setAiState('互动短剧已一键生成，可继续生成下一幕或直接发布验收')
+    setInteractiveQuickState('已生成可试玩互动短剧：先试玩，再细修分支和付费隐藏线')
+    setBeginnerCreationState('互动短剧已生成，可直接试玩或发布试卖')
+    setActiveStudioPage('story')
+    void syncProjectToApi(draftProject).then((savedProject) => {
+      setProject(savedProject)
+      setProjectListState('互动短剧已保存')
+    })
+    void refreshTeamState(activeWorkspaceId).catch(() => {
+      setProjectListState('互动短剧已生成，活动记录稍后同步')
+    })
   }
 
   async function runSeriesPrimaryAction() {
@@ -8879,6 +9513,7 @@ function StudioApp() {
   function focusStoryNode(nodeId: string, reason: string) {
     setSelectedNodeId(nodeId)
     setSearchQuery('')
+    setLibtvDrawerTab('node')
     setRuntimeMessage(reason)
   }
 
@@ -9104,6 +9739,252 @@ function StudioApp() {
       ),
     }))
     setRuntimeMessage(`${nodeId} 已标记为${formatNodePaywallMode(paywall)}`)
+  }
+
+  async function runCanvasNode(nodeId = selectedNodeId) {
+    const node = project.nodes.find((item) => item.id === nodeId)
+    if (!node) {
+      setWorkflowRunState(`节点不存在：${nodeId}`)
+      return
+    }
+    if (!projectHasRemoteRecord) {
+      setWorkflowRunState('请先保存为云端作品，再运行画布节点')
+      setRuntimeMessage('当前还是本地草稿，保存后才能沉淀节点历史和素材')
+      return
+    }
+    if (isExternalProviderAuth && !hasWorkspaceSession) {
+      setWorkflowRunState('请先登录工作区，再运行画布节点')
+      return
+    }
+
+    const startedAt = new Date().toISOString()
+    const nodeType = getLibtvNodeType(node)
+    setNodeRunRecords((current) => ({
+      ...current,
+      [nodeId]: {
+        ...(current[nodeId] || {}),
+        projectId: project.id,
+        workspaceId: activeWorkspaceId || undefined,
+        nodeId,
+        nodeType,
+        status: 'queued',
+        progress: 12,
+        message: '已进入执行队列',
+        outputTitle: '等待输出',
+        outputPreview: '正在准备节点输入和模型参数。',
+        updatedAt: startedAt,
+        credits: 0,
+      },
+    }))
+    setWorkflowRunState(`正在运行 ${node.id} · ${node.title}`)
+
+    setNodeRunRecords((current) => ({
+      ...current,
+      [nodeId]: {
+        ...(current[nodeId] || {}),
+        status: 'running',
+        progress: 64,
+        message: '模型执行中',
+        outputTitle: '生成中',
+        outputPreview: '正在生成可复用结果。',
+        updatedAt: new Date().toISOString(),
+        credits: 0,
+      },
+    }))
+
+    try {
+      const result = await runRemoteCanvasNode<NodeRunRecord, CanvasAsset>(project.id, nodeId, {
+        nodeType,
+        prompt: node.prompt?.trim() || node.summary || beginnerIdea,
+        model: node.model || libtvNodeTypeModels[nodeType],
+      })
+      setCanvasAssets((current) => [result.asset, ...current.filter((item) => item.id !== result.asset.id)].slice(0, 24))
+      setNodeRunRecords((current) => ({
+        ...current,
+        [nodeId]: result.run,
+      }))
+      setWorkflowRunState(`${node.id} 已完成，消耗 ${result.run.credits} 积分`)
+      setRuntimeMessage(`${node.id} 已生成输出并进入资产/历史`)
+      setLibtvDrawerTab('history')
+    } catch (error) {
+      logError('api', error)
+      const failedAt = new Date().toISOString()
+      setNodeRunRecords((current) => ({
+        ...current,
+        [nodeId]: {
+          ...(current[nodeId] || {}),
+          status: 'failed',
+          progress: 100,
+          message: error instanceof Error ? error.message : '节点运行失败',
+          outputTitle: '运行失败',
+          outputPreview: '后端执行未完成，请检查登录状态或服务连接。',
+          updatedAt: failedAt,
+          credits: 0,
+        },
+      }))
+      setWorkflowRunState(`${node.id} 运行失败`)
+    }
+  }
+
+  async function runCanvasWorkflow() {
+    if (!projectHasRemoteRecord) {
+      setWorkflowRunState('请先保存为云端作品，再运行整张画布')
+      setRuntimeMessage('当前还是本地草稿，保存后才能沉淀工作流历史')
+      return
+    }
+    if (isExternalProviderAuth && !hasWorkspaceSession) {
+      setWorkflowRunState('请先登录工作区，再运行整张画布')
+      return
+    }
+
+    const queuedAt = new Date().toISOString()
+    setNodeRunRecords((current) => {
+      const next = { ...current }
+      storyNodes.forEach((node) => {
+        const nodeType = getLibtvNodeType(node)
+        next[node.id] = {
+          ...(next[node.id] || {}),
+          projectId: project.id,
+          workspaceId: activeWorkspaceId || undefined,
+          nodeId: node.id,
+          nodeType,
+          status: 'queued',
+          progress: 8,
+          message: '等待工作流调度',
+          outputTitle: '等待输出',
+          outputPreview: '正在按画布连接顺序准备执行。',
+          updatedAt: queuedAt,
+          credits: 0,
+        }
+      })
+      return next
+    })
+    setWorkflowRunState(`正在运行 ${storyNodes.length} 个节点`)
+    try {
+      const result = await runRemoteCanvasWorkflow<CanvasWorkflowRun, NodeRunRecord, CanvasAsset>(project.id, {
+        scope: 'all',
+      })
+      setCanvasAssets((current) => {
+        const byId = new Map(current.map((asset) => [asset.id, asset]))
+        result.assets.forEach((asset) => byId.set(asset.id, asset))
+        return Array.from(byId.values())
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .slice(0, 24)
+      })
+      setNodeRunRecords((current) => {
+        const next = { ...current }
+        result.runs.forEach((run) => {
+          if (run.nodeId) next[run.nodeId] = run
+        })
+        return next
+      })
+      setWorkflowRunState(result.workflow.message)
+      setRuntimeMessage(`工作流完成：${result.workflow.runIds.length} 个节点，消耗 ${result.workflow.credits} 积分`)
+      setLibtvDrawerTab('history')
+    } catch (error) {
+      logError('api', error)
+      setNodeRunRecords((current) => {
+        const next = { ...current }
+        storyNodes.forEach((node) => {
+          next[node.id] = {
+            ...(next[node.id] || {}),
+            status: 'failed',
+            progress: 100,
+            message: error instanceof Error ? error.message : '工作流运行失败',
+            outputTitle: '运行失败',
+            outputPreview: '整张画布未完成，请检查登录状态或服务连接。',
+            updatedAt: new Date().toISOString(),
+            credits: 0,
+          }
+        })
+        return next
+      })
+      setWorkflowRunState('工作流运行失败')
+    }
+  }
+
+  function applyCanvasAssetToSelectedNode(asset: CanvasAsset) {
+    const nextPrompt = [
+      selectedNode.prompt || selectedNode.summary,
+      `复用素材：${asset.name}`,
+      asset.source,
+    ].filter(Boolean).join('\n')
+    updateSelectedNode('prompt', nextPrompt)
+    setLibtvDrawerTab('node')
+    setRuntimeMessage(`已把 ${asset.name} 回填到 ${selectedNode.id}`)
+  }
+
+  async function handleCanvasAssetUpload(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget
+    const files = Array.from(input.files || [])
+    if (files.length === 0) return
+    if (!projectHasRemoteRecord) {
+      setAiState('请先保存为云端作品，再导入画布素材')
+      input.value = ''
+      return
+    }
+    if (isExternalProviderAuth && !hasWorkspaceSession) {
+      setAiState('请先登录工作区，再导入画布素材')
+      input.value = ''
+      return
+    }
+    const uploadedAt = new Date().toISOString()
+    const optimisticAssets: CanvasAsset[] = files.map((file) => {
+      const type = inferCanvasAssetType(file.name, file.type)
+      return {
+        id: createClientId('upload'),
+        type,
+        name: file.name,
+        meta: `${type.toUpperCase()} · ${(file.size / 1024).toFixed(1)} KB`,
+        source: '正在登记到画布素材库',
+        status: 'processing' as const,
+        createdAt: uploadedAt,
+        fileName: file.name,
+        mimeType: file.type,
+        size: file.size,
+      }
+    })
+    setCanvasAssets((current) => [...optimisticAssets, ...current].slice(0, 24))
+    setLibtvDrawerTab('assets')
+    setAiState(`正在导入 ${optimisticAssets.length} 个素材`)
+    try {
+      const assets = await Promise.all(
+        files.map((file) => {
+          const type = inferCanvasAssetType(file.name, file.type)
+          return createCanvasAsset<CanvasAsset>(project.id, {
+            type,
+            name: file.name,
+            meta: `${type.toUpperCase()} · ${(file.size / 1024).toFixed(1)} KB`,
+            source: '本地上传，已登记到画布素材库',
+            status: 'ready',
+            fileName: file.name,
+            mimeType: file.type,
+            size: file.size,
+          })
+        }),
+      )
+      setCanvasAssets((current) => [
+        ...assets,
+        ...current.filter((asset) => !optimisticAssets.some((item) => item.id === asset.id)),
+      ].slice(0, 24))
+      setAiState(`已导入 ${assets.length} 个素材，可复用到当前节点`)
+    } catch (error) {
+      logError('api', error)
+      setCanvasAssets((current) =>
+        current.map((asset) =>
+          optimisticAssets.some((item) => item.id === asset.id)
+            ? {
+                ...asset,
+                status: 'failed',
+                source: '素材登记失败，请检查登录状态或服务连接。',
+              }
+            : asset,
+        ),
+      )
+      setAiState('素材导入失败，请稍后重试')
+    } finally {
+      input.value = ''
+    }
   }
 
   function generatePaidHiddenLine(options: { trialMode?: boolean } = {}) {
@@ -9332,6 +10213,51 @@ function StudioApp() {
     }))
   }
 
+  function startCanvasEdgeDraft(sourceNodeId = selectedNode.id) {
+    setStoryEdgeDraftSourceId(sourceNodeId)
+    setRuntimeMessage(`选择一个目标节点，为 ${sourceNodeId} 创建画布连线`)
+  }
+
+  function connectCanvasEdgeTarget(targetNodeId: string) {
+    const sourceNodeId = storyEdgeDraftSourceId
+    if (!sourceNodeId) return false
+    if (sourceNodeId === targetNodeId) {
+      setRuntimeMessage('不能把节点连到自己，请选择另一个目标节点')
+      return true
+    }
+
+    const target = storyNodes.find((node) => node.id === targetNodeId)
+    if (!target) {
+      setRuntimeMessage(`目标节点不存在：${targetNodeId}`)
+      return true
+    }
+
+    let didCreate = false
+    updateProject((current) => ({
+      ...current,
+      nodes: current.nodes.map((node) => {
+        if (node.id !== sourceNodeId) return node
+        if (node.choices.some((choiceItem) => choiceItem.targetNodeId === targetNodeId)) return node
+        didCreate = true
+        return {
+          ...node,
+          choices: [
+            ...node.choices,
+            choice(createClientId('EDGE'), `连接到${target.title}`, targetNodeId),
+          ],
+        }
+      }),
+    }))
+    setStoryEdgeDraftSourceId(null)
+    setSelectedNodeId(targetNodeId)
+    setRuntimeMessage(
+      didCreate
+        ? `已创建连线：${sourceNodeId} -> ${targetNodeId}`
+        : `${sourceNodeId} 已经连接到 ${targetNodeId}`,
+    )
+    return true
+  }
+
   function removeChoice(index: number) {
     updateProject((current) => ({
       ...current,
@@ -9352,14 +10278,75 @@ function StudioApp() {
       id: `S${String(nextNumber).padStart(2, '0')}`,
       title: '新的剧情节点',
       kind: 'Choice',
+      nodeType: 'text',
       summary: '描述这一幕的冲突、线索和玩家需要做出的决定',
       metric: '待测',
+      prompt: '',
+      model: '',
       choices: [choice(createClientId('C'), '继续调查', selectedNode.id)],
     }
 
     updateProject((current) => ({ ...current, nodes: [...current.nodes, nextNode] }))
     setSelectedNodeId(nextNode.id)
     setSearchQuery('')
+    setLibtvDrawerTab('node')
+  }
+
+  function addTypedCanvasNode(nodeType: LibtvNodeType) {
+    const existingIds = new Set(storyNodes.map((node) => node.id))
+    let nextNumber = storyNodes.length + 1
+    let nextId = `S${String(nextNumber).padStart(2, '0')}`
+    while (existingIds.has(nextId)) {
+      nextNumber += 1
+      nextId = `S${String(nextNumber).padStart(2, '0')}`
+    }
+    const titlePrefix = libtvNodeTypeLabels[nodeType]
+    const nextKind: NodeKind =
+      nodeType === 'composite' ? 'Ending' : nodeType === 'director' ? 'Puzzle' : 'Choice'
+    const nextNode: StoryNode = {
+      id: nextId,
+      title: `${titlePrefix}节点`,
+      kind: nextKind,
+      nodeType,
+      summary: `配置${titlePrefix}生成参数，运行后输出会进入右侧资产和历史。`,
+      metric: nodeType === 'composite' ? '合成输出' : '待运行',
+      prompt: beginnerIdea,
+      model: libtvNodeTypeModels[nodeType],
+      paywall: nodeType === 'composite' ? 'free' : undefined,
+      choices: [],
+    }
+
+    updateProject((current) => ({
+      ...current,
+      nodes: [
+        ...current.nodes.map((node) =>
+          node.id === selectedNode.id && node.kind !== 'Ending'
+            ? {
+                ...node,
+                choices: [
+                  ...node.choices,
+                  choice(createClientId('EDGE'), `进入${titlePrefix}节点`, nextNode.id),
+                ],
+              }
+            : node,
+        ),
+        nextNode,
+      ],
+      updatedAt: new Date().toISOString(),
+    }))
+    const sourceCanvasNode = storyCanvasNodeById.get(selectedNode.id)
+    if (sourceCanvasNode) {
+      setStoryCanvasNodePositions((current) => ({
+        ...current,
+        [nextNode.id]: {
+          x: sourceCanvasNode.x + 260,
+          y: sourceCanvasNode.y + (storyNodes.length % 2 === 0 ? 92 : -92),
+        },
+      }))
+    }
+    setSelectedNodeId(nextNode.id)
+    setLibtvDrawerTab('node')
+    setRuntimeMessage(`已添加${titlePrefix}节点，可直接配置并运行`)
   }
 
   async function generateNextScene() {
@@ -10250,7 +11237,7 @@ function StudioApp() {
   }
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell page-${activeStudioPage}`}>
       <input
         ref={fileInputRef}
         className="file-input"
@@ -10266,18 +11253,18 @@ function StudioApp() {
           </div>
           <div>
             <strong>PlayDrama</strong>
-            <span>AI 互动短剧工作台</span>
+            <span>AI 互动短剧创作工具</span>
           </div>
         </div>
 
-        <nav className="nav-list" aria-label="Main">
+        <nav className="nav-list primary-nav" aria-label="主入口">
           <button
             className={`nav-item ${activeStudioPage === 'overview' ? 'active' : ''}`}
             type="button"
             onClick={() => setActiveStudioPage('overview')}
           >
             <Layers3 size={18} />
-            项目总览
+            发现
           </button>
           <button
             className={`nav-item ${activeStudioPage === 'creation' ? 'active' : ''}`}
@@ -10285,7 +11272,7 @@ function StudioApp() {
             onClick={() => setActiveStudioPage('creation')}
           >
             <Wand2 size={18} />
-            创作模式
+            开始创作
           </button>
           <button
             className={`nav-item ${activeStudioPage === 'story' ? 'active' : ''}`}
@@ -10293,7 +11280,7 @@ function StudioApp() {
             onClick={() => setActiveStudioPage('story')}
           >
             <GitBranch size={18} />
-            剧情编辑
+            创作画布
           </button>
           <button
             className={`nav-item ${activeStudioPage === 'characters' ? 'active' : ''}`}
@@ -10301,8 +11288,20 @@ function StudioApp() {
             onClick={() => setActiveStudioPage('characters')}
           >
             <Users size={18} />
-            角色资产
+            资产
           </button>
+          <button
+            className={`nav-item ${activeStudioPage === 'publish' ? 'active' : ''}`}
+            type="button"
+            onClick={() => setActiveStudioPage('publish')}
+          >
+            <Share2 size={18} />
+            发布
+          </button>
+        </nav>
+
+        <div className="nav-group-label">创作工具</div>
+        <nav className="nav-list secondary-nav" aria-label="创作工具">
           <button
             className={`nav-item ${activeStudioPage === 'ai' ? 'active' : ''}`}
             type="button"
@@ -10312,12 +11311,28 @@ function StudioApp() {
             普通短剧
           </button>
           <button
-            className={`nav-item ${activeStudioPage === 'publish' ? 'active' : ''}`}
+            className={`nav-item ${activeStudioPage === 'video' ? 'active' : ''}`}
             type="button"
-            onClick={() => setActiveStudioPage('publish')}
+            onClick={() => setActiveStudioPage('video')}
           >
-            <Share2 size={18} />
-            发布变现
+            <Video size={18} />
+            视频
+          </button>
+          <button
+            className={`nav-item ${activeStudioPage === 'storyboard' ? 'active' : ''}`}
+            type="button"
+            onClick={() => setActiveStudioPage('storyboard')}
+          >
+            <Grid3x3 size={18} />
+            分镜
+          </button>
+          <button
+            className={`nav-item ${activeStudioPage === 'skills' ? 'active' : ''}`}
+            type="button"
+            onClick={() => setActiveStudioPage('skills')}
+          >
+            <Zap size={18} />
+            工具箱
           </button>
         </nav>
 
@@ -10552,6 +11567,15 @@ function StudioApp() {
             />
           </div>
           <div className="topbar-actions">
+            <button
+              className="primary-button studio-quick-create-toggle"
+              type="button"
+              onClick={() => setShowStudioQuickCreate((current) => !current)}
+              aria-expanded={showStudioQuickCreate}
+            >
+              <Plus size={17} />
+              <span className="studio-quick-create-label">开始创作</span>
+            </button>
             <label className="search">
               <Search size={17} />
               <input
@@ -10560,6 +11584,15 @@ function StudioApp() {
                 onChange={(event) => setSearchQuery(event.target.value)}
               />
             </label>
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={toggleTheme}
+              aria-label="切换主题"
+              title={resolvedTheme === 'dark' ? '切换为浅色模式' : '切换为深色模式'}
+            >
+              {resolvedTheme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+            </button>
             <span className="save-state">{saveState}</span>
             <button
               className="ghost-button"
@@ -10614,6 +11647,83 @@ function StudioApp() {
           </div>
         </header>
 
+        {showStudioQuickCreate && (
+          <section className="studio-quick-create-panel" aria-label="快速创作">
+            <div className="studio-quick-create-head">
+              <div>
+                <span>快速创作</span>
+                <strong>选模式，输入一句话，直接进入对应工具</strong>
+              </div>
+              <button
+                className="ghost-button compact"
+                type="button"
+                onClick={() => setShowStudioQuickCreate(false)}
+              >
+                关闭
+              </button>
+            </div>
+            <label className="studio-quick-prompt">
+              <span>一句话创意</span>
+              <textarea
+                value={studioQuickPrompt}
+                onChange={(event) => {
+                  setStudioQuickPrompt(event.target.value)
+                  writeStoredValue(QUICK_PROMPT_STORAGE_KEY, event.target.value)
+                }}
+                placeholder="例如：女主每次接到午夜电话都会回到三分钟前"
+              />
+            </label>
+            <div className="studio-quick-presets" aria-label="创意预设">
+              {studioQuickPromptPresets.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => {
+                    setStudioQuickPrompt(item)
+                    writeStoredValue(QUICK_PROMPT_STORAGE_KEY, item)
+                  }}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+            <div className="studio-quick-mode-grid" aria-label="创作模式">
+              {studioQuickModes.map((mode) => (
+                <button
+                  className={`studio-quick-mode-card ${mode.page === activeStudioPage ? 'active' : ''}`}
+                  key={mode.id}
+                  type="button"
+                  onClick={() => launchStudioQuickMode(mode.page)}
+                >
+                  <span>{mode.icon}</span>
+                  <em>{mode.badge}</em>
+                  <strong>{mode.title}</strong>
+                  <small>{mode.detail}</small>
+                  <b>
+                    {mode.cta}
+                    <ChevronRight size={14} />
+                  </b>
+                </button>
+              ))}
+            </div>
+            <div className="studio-quick-create-actions">
+              <button
+                className="primary-button compact"
+                type="button"
+                onClick={runStudioQuickExperience}
+                disabled={isSeriesGenerating || isAiBusy}
+              >
+                <Sparkles size={16} />
+                {isSeriesGenerating ? '生成中' : '快速体验'}
+              </button>
+              <button className="ghost-button compact" type="button" onClick={() => launchStudioQuickMode('story')}>
+                <GitBranch size={16} />
+                进入互动编辑
+              </button>
+            </div>
+          </section>
+        )}
+
         <section className="prelaunch-strip" aria-label="上线前状态">
           {prelaunchStripItems.map((item) => (
             <article className={`prelaunch-item ${item.tone}`} key={item.label}>
@@ -10625,6 +11735,128 @@ function StudioApp() {
 
         {activeStudioPage === 'overview' && (
           <>
+        <section className="studio-libtv-command" aria-label="PlayDrama 创作首页">
+          <div className="studio-libtv-head">
+            <div>
+              <span className="studio-libtv-badge">
+                <Flame size={15} />
+                创作首页
+              </span>
+              <h2>从开始创作进入画布，像 LibTV 一样把脚本、分镜、视频放在一张图里</h2>
+              <p>
+                首页只保留最近项目、案例广场和一个明确主动作。进入画布后，普通短剧和互动短剧都从故事脚本节点开始，再继续生成分镜、视频、付费结局和发布回流。
+              </p>
+            </div>
+            <div className="studio-libtv-actions">
+              <button className="primary-button" type="button" onClick={() => setActiveStudioPage('story')}>
+                <GitBranch size={17} />
+                开始创作
+              </button>
+              <button className="ghost-button on-dark" type="button" onClick={() => void generateBeginnerShortDrama()}>
+                <Sparkles size={17} />
+                {isSeriesGenerating ? '生成中' : '快速体验'}
+              </button>
+            </div>
+          </div>
+
+          <div className="studio-libtv-hero-grid" aria-label="精选创作入口">
+            <button className="studio-libtv-hero-card primary" type="button" onClick={() => setActiveStudioPage('story')}>
+              <span>个人最近项目</span>
+              <strong>{project.title}</strong>
+              <em>{storyNodes.length} 节点、{connectionCount} 条连线，保留互动分支和付费隐藏线。</em>
+              <b>
+                继续制作
+                <ChevronRight size={14} />
+              </b>
+            </button>
+            <button className="studio-libtv-hero-card show" type="button" onClick={() => setActiveStudioPage('creation')}>
+              <span>开始创作</span>
+              <strong>故事脚本生成</strong>
+              <em>先生成脚本节点，再在画布里继续批量分镜和视频。</em>
+              <b>
+                进入画布
+                <ChevronRight size={14} />
+              </b>
+            </button>
+            <button className="studio-libtv-hero-card video" type="button" onClick={() => setActiveStudioPage('video')}>
+              <span>TV Show</span>
+              <strong>分镜视频队列</strong>
+              <em>案例、素材、视频任务和交付包收进同一个生产流。</em>
+              <b>
+                查看视频队列
+                <ChevronRight size={14} />
+              </b>
+            </button>
+          </div>
+
+          <div className="studio-libtv-discovery-head">
+            <div>
+              <strong>灵感创作</strong>
+              <span>对标平台的素材发现密度，内容围绕互动短剧生产闭环。</span>
+            </div>
+            <label>
+              <Search size={16} />
+              <input
+                placeholder="搜索作品、节点、角色"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+              />
+            </label>
+          </div>
+
+          <div className="studio-libtv-discovery-grid" aria-label="创作发现">
+            <button className="studio-libtv-work-card hospital" type="button" onClick={() => setActiveStudioPage('story')}>
+              <span>悬疑互动</span>
+              <strong>午夜来电</strong>
+              <em>{storyNodes.length} 节点 · {connectionCount} 分支</em>
+              <small>立即编辑</small>
+            </button>
+            <button className="studio-libtv-work-card paywall" type="button" onClick={() => setActiveStudioPage('publish')}>
+              <span>付费结局</span>
+              <strong>隐藏线解锁</strong>
+              <em>{paidEndingRows.length} 个付费结局 · {paymentProviderReady ? '通道可用' : '等待配置'}</em>
+              <small>去发布</small>
+            </button>
+            <button className="studio-libtv-work-card seedrama" type="button" onClick={() => setActiveStudioPage('video')}>
+              <span>视频生成</span>
+              <strong>分镜 Prompt</strong>
+              <em>{videoShotPipelineRows.length || visibleGeneratedReview?.storyboardShots.length || 15} 个镜头 · 队列生成</em>
+              <small>看队列</small>
+            </button>
+            <button className="studio-libtv-work-card trial" type="button" onClick={activateCustomerTrialMode}>
+              <span>客户试用</span>
+              <strong>3 分钟演示</strong>
+              <em>{customerTrialProgressLabel}</em>
+              <small>启动体验</small>
+            </button>
+          </div>
+
+          <label className="studio-flow-prompt">
+            <span>一句话想法</span>
+            <textarea
+              value={beginnerIdea}
+              onChange={(event) => {
+                setBeginnerIdea(event.target.value)
+                setStudioQuickPrompt(event.target.value)
+                setSeriesGenerator((current) => ({ ...current, idea: event.target.value }))
+                writeStoredValue(QUICK_PROMPT_STORAGE_KEY, event.target.value)
+              }}
+              placeholder="例如：外卖员发现每个差评都会让同一天重新开始"
+            />
+          </label>
+        </section>
+        <section className={`studio-more-tools ${showStudioMoreTools ? 'open' : ''}`}>
+          <button
+            className="studio-more-tools-summary"
+            type="button"
+            onClick={() => setShowStudioMoreTools((current) => !current)}
+            aria-expanded={showStudioMoreTools}
+          >
+            <span>更多工具和完整演示材料</span>
+            <em>作品库、客户试用、双业务线和上线门禁都在这里</em>
+          </button>
+          {showStudioMoreTools && (
+          <div className="studio-more-tools-body">
         <section className="customer-onboarding-panel" aria-label="3 分钟客户试用入口">
           <div className="customer-onboarding-copy">
             <p className="eyebrow">客户试用入口</p>
@@ -11265,9 +12497,13 @@ function StudioApp() {
             </div>
           )}
         </section>
+          </div>
+          )}
+        </section>
           </>
         )}
 
+        {(activeStudioPage !== 'overview' || showStudioMoreTools) && (
         <div
           className={`content-grid page-${activeStudioPage} ${
             activeStudioPage === 'story' ? '' : 'single-column'
@@ -12059,7 +13295,881 @@ function StudioApp() {
               </div>
             </section>
           )}
-          <section className={pagePanelClass('panel story-panel', ['story'])}>
+          <section
+            className={pagePanelClass(
+              `panel story-panel ${showLibtvDetailPanel ? 'show-libtv-details' : ''}`,
+              ['story'],
+            )}
+          >
+            <div className="libtv-canvas-workspace" aria-label="LibTV style interactive drama workspace">
+              <input
+                ref={assetUploadInputRef}
+                className="libtv-hidden-file-input"
+                type="file"
+                multiple
+                accept="image/*,video/*,audio/*,.txt,.md,.json"
+                onChange={handleCanvasAssetUpload}
+              />
+              <aside className="libtv-canvas-sidebar" aria-label="画布侧栏">
+                <div className="libtv-canvas-logo">
+                  <GitBranch size={18} />
+                  <div>
+                    <strong>{project.title}</strong>
+                    <span>画布 1</span>
+                  </div>
+                </div>
+                <div className="libtv-canvas-tabs" role="tablist" aria-label="画布和资产">
+                  <button
+                    className={libtvDrawerTab === 'node' ? 'active' : ''}
+                    type="button"
+                    onClick={() => setLibtvDrawerTab('node')}
+                  >
+                    画布
+                  </button>
+                  <button
+                    className={libtvDrawerTab === 'assets' ? 'active' : ''}
+                    type="button"
+                    onClick={() => {
+                      setLibtvDrawerTab('assets')
+                      setAiState('资产面板已在右侧展开，可继续筛选素材')
+                    }}
+                  >
+                    资产
+                  </button>
+                </div>
+                <div className="libtv-canvas-search">
+                  <Search size={15} />
+                  <input
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="搜索节点"
+                    aria-label="搜索节点"
+                  />
+                </div>
+                <div className="libtv-canvas-node-list">
+                  {storyNodes.slice(0, 6).map((node) => (
+                    <button
+                      className={node.id === selectedNodeId ? 'active' : ''}
+                      key={node.id}
+                      type="button"
+                      onClick={() => focusStoryNode(node.id, `已定位 ${node.id} · ${node.title}`)}
+                    >
+                      <FileText size={15} />
+                      <span>{node.title}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="libtv-canvas-sidebar-foot">
+                  <span>共 {storyNodes.length} 节点</span>
+                  <button type="button" onClick={createNewProject}>
+                    <Plus size={14} />
+                  </button>
+                </div>
+              </aside>
+
+              <main className="libtv-canvas-main">
+                <div className="libtv-canvas-topbar">
+                  <div>
+                    <span>{project.title || '未命名项目'} · 画布 1</span>
+                    <strong>从故事脚本开始，分镜、视频、互动分支都在节点里继续生成</strong>
+                  </div>
+                  <div className="libtv-canvas-account-strip" aria-label="项目状态">
+                    <span>{canvasCreditsRemaining} 积分</span>
+                    <span>{members.length || 1} 成员</span>
+                    <span>{publishBuilds.length || 0} 版本</span>
+                    <span>{publishedBuildId ? '已发布' : '草稿'}</span>
+                  </div>
+                  <div className="libtv-canvas-top-actions">
+                    <button
+                      className={libtvDrawerTab === 'toolbox' ? 'active' : ''}
+                      type="button"
+                      onClick={() => {
+                        setLibtvDrawerTab('toolbox')
+                        setProjectListState('工具箱模板已在画布内打开')
+                      }}
+                    >
+                      <Layers3 size={15} />
+                      工具箱
+                    </button>
+                    <button
+                      className={libtvDrawerTab === 'history' ? 'active' : ''}
+                      type="button"
+                      onClick={() => {
+                        setLibtvDrawerTab('history')
+                        setProjectListState('历史记录在右侧生成记录里查看')
+                      }}
+                    >
+                      <RotateCcw size={15} />
+                      历史
+                    </button>
+                    <button
+                      className={showLibtvDetailPanel ? 'active' : ''}
+                      type="button"
+                      onClick={() => setShowLibtvDetailPanel((current) => !current)}
+                    >
+                      <Grid3x3 size={15} />
+                      {showLibtvDetailPanel ? '收起' : '细修'}
+                    </button>
+                    <button type="button" onClick={() => void runCanvasWorkflow()}>
+                      <Zap size={15} />
+                      运行
+                    </button>
+                    <button className="accent" type="button" onClick={() => void generateInteractiveShortDramaProject()}>
+                      <Sparkles size={15} />
+                      开始创作
+                    </button>
+                  </div>
+                </div>
+
+                <div className="libtv-canvas-stage">
+                  <div className="libtv-canvas-empty-hint">
+                    <Sparkles size={17} />
+                    <span>双击画布自由生成节点，或从下方四个专业入口开始</span>
+                  </div>
+
+                  <div className="libtv-canvas-entry-row">
+                    {libtvCanvasEntryCards.map((card) => (
+                      <button
+                        className={`libtv-entry-card ${card.tone}`}
+                        key={card.id}
+                        type="button"
+                        onClick={card.action}
+                      >
+                        <span>{card.icon}</span>
+                        <strong>{card.title}</strong>
+                        <em>{card.detail}</em>
+                        <small>{card.cta}</small>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="libtv-canvas-generator-bar" aria-label="一句话生成">
+                    <label>
+                      <span>一句话想法</span>
+                      <textarea
+                        value={beginnerIdea}
+                        onChange={(event) => {
+                          setBeginnerIdea(event.target.value)
+                          setStudioQuickPrompt(event.target.value)
+                          setSeriesGenerator((current) => ({ ...current, idea: event.target.value }))
+                          writeStoredValue(QUICK_PROMPT_STORAGE_KEY, event.target.value)
+                        }}
+                        placeholder="例如：女主每次接到午夜电话都会回到三分钟前"
+                      />
+                    </label>
+                    <div className="libtv-generator-meta">
+                      <button type="button">{beginnerGenre}</button>
+                      <button type="button">{beginnerLength}</button>
+                      <button type="button">{formatMonetization(beginnerSeriesInput.monetization)}</button>
+                    </div>
+                    <div className="libtv-generator-actions">
+                      <button className="libtv-node-generate muted" type="button" onClick={() => void generateCanvasShortDramaProject()}>
+                        <Clapperboard size={15} />
+                        普通短剧
+                      </button>
+                      <button className="libtv-node-generate" type="button" onClick={() => void generateInteractiveShortDramaProject()}>
+                        <Sparkles size={15} />
+                        互动短剧
+                      </button>
+                    </div>
+                  </div>
+
+                  {(selectedNodeRunRecord.status === 'succeeded' ||
+                    selectedNodeRunRecord.status === 'running' ||
+                    selectedNodeRunRecord.status === 'queued') && (
+                    <div className={`libtv-context-toolbar ${selectedNodeRunRecord.status}`} aria-label="当前结果操作">
+                      <button type="button" onClick={() => void runCanvasNode(selectedNode.id)}>
+                        <RotateCcw size={15} />
+                        重新生成
+                      </button>
+                      <button type="button" onClick={() => setActiveStudioPage('storyboard')}>
+                        <Grid3x3 size={15} />
+                        批量生成分镜
+                      </button>
+                      <button type="button" onClick={() => setActiveStudioPage('video')}>
+                        <Video size={15} />
+                        批量生视频
+                      </button>
+                      <button type="button" onClick={exportFinalVideoDeliveryPack}>
+                        <Download size={15} />
+                        下载
+                      </button>
+                      <span>
+                        {selectedNodeRunRecord.status === 'succeeded'
+                          ? '结果已在节点和资产库中，可继续下一步'
+                          : `${selectedNodeRunRecord.message} · ${selectedNodeRunRecord.progress}%`}
+                      </span>
+                    </div>
+                  )}
+
+                  <div
+                    className={`libtv-live-canvas ${storyCanvasDrag ? `dragging-${storyCanvasDrag.kind}` : ''}`}
+                    aria-label="互动短剧节点画布"
+                  >
+                    <div className="story-canvas-toolbar">
+                      <div>
+                        <span>{storyEdgeDraftSourceId ? `连线模式：${storyEdgeDraftSourceId}` : '节点画布'}</span>
+                        <strong>
+                          {storyEdgeDraftSourceId
+                            ? '点击目标节点创建分支'
+                            : `${storyCanvasNodes.length} 节点 · ${storyCanvasEdges.length} 连线`}
+                        </strong>
+                      </div>
+                      <div className="story-canvas-controls">
+                        <button type="button" onClick={() => updateStoryCanvasZoom(-0.1)} aria-label="缩小画布">
+                          <Minus size={15} />
+                        </button>
+                        <span>{Math.round(storyCanvasZoom * 100)}%</span>
+                        <button type="button" onClick={() => updateStoryCanvasZoom(0.1)} aria-label="放大画布">
+                          <Plus size={15} />
+                        </button>
+                        <button type="button" onClick={resetStoryCanvasView}>
+                          <RotateCcw size={15} />
+                          重置
+                        </button>
+                      </div>
+                    </div>
+                    <div
+                      className="story-canvas-viewport"
+                      onDoubleClick={(event) => {
+                        if ((event.target as HTMLElement).closest('.graph-node')) return
+                        addStoryNode()
+                      }}
+                      onPointerDown={startStoryCanvasPan}
+                      onWheel={handleStoryCanvasWheel}
+                    >
+                      <div
+                        className="story-canvas-stage"
+                        style={{
+                          width: `${storyCanvasSize.width}px`,
+                          height: `${storyCanvasSize.height}px`,
+                          transform: `translate(${storyCanvasPan.x}px, ${storyCanvasPan.y}px) scale(${storyCanvasZoom})`,
+                        }}
+                      >
+                        <svg
+                          className="story-canvas-edges"
+                          viewBox={`0 0 ${storyCanvasSize.width} ${storyCanvasSize.height}`}
+                          aria-hidden="true"
+                        >
+                          <defs>
+                            <marker
+                              id="libtvStoryCanvasArrow"
+                              markerHeight="8"
+                              markerWidth="8"
+                              orient="auto"
+                              refX="7"
+                              refY="4"
+                            >
+                              <path d="M 0 0 L 8 4 L 0 8 z" />
+                            </marker>
+                          </defs>
+                          {storyCanvasEdges.map((edge) => (
+                            <g className={`story-canvas-edge ${edge.tone}`} key={edge.id}>
+                              <path d={edge.path} markerEnd="url(#libtvStoryCanvasArrow)" />
+                              <text x={edge.labelX} y={edge.labelY - 10}>
+                                {edge.label}
+                              </text>
+                            </g>
+                          ))}
+                        </svg>
+                        {storyCanvasNodes.map(({ node, diagnostic, x, y }) => {
+                          const runRecord = nodeRunRecords[node.id]
+                          const runStatus = runRecord?.status || 'idle'
+                          const isNodeRunning = runStatus === 'queued' || runStatus === 'running'
+                          const isNodeDone = runStatus === 'succeeded'
+                          return (
+                            <button
+                              className={`graph-node ${node.id === selectedNodeId ? 'selected' : ''} ${
+                                node.id === storyEdgeDraftSourceId ? 'edge-source' : ''
+                              } ${
+                                storyEdgeDraftSourceId && node.id !== storyEdgeDraftSourceId ? 'edge-target' : ''
+                              } ${
+                                diagnostic?.status || 'clean'
+                              } run-${runStatus}`}
+                              key={node.id}
+                              type="button"
+                              style={{
+                                left: `${x}px`,
+                                top: `${y}px`,
+                                width: `${storyCanvasNodeWidth}px`,
+                                minHeight: `${storyCanvasNodeHeight}px`,
+                              }}
+                              onClick={() => {
+                                if (connectCanvasEdgeTarget(node.id)) return
+                                setSelectedNodeId(node.id)
+                                setLibtvDrawerTab('node')
+                              }}
+                              onPointerDown={(event) => startStoryNodeDrag(event, node.id)}
+                            >
+                              <span>{node.id}</span>
+                              <strong>{node.title}</strong>
+                              <em>{libtvNodeTypeLabels[getLibtvNodeType(node)]} · {node.kind}</em>
+                              <small>
+                                {node.choices.length > 0
+                                  ? node.choices.map((item) => item.targetNodeId).join(' / ')
+                                  : '暂无后续节点'}
+                              </small>
+                              {isNodeRunning && (
+                                <span className="libtv-graph-node-progress">
+                                  <b style={{ width: `${runRecord?.progress || 12}%` }} />
+                                  生成中 {runRecord?.progress || 12}% · 可取消
+                                </span>
+                              )}
+                              {isNodeDone && (
+                                <span className="libtv-graph-node-flow">
+                                  <b>确认镜头</b>
+                                  <b>准备资产</b>
+                                  <b>合成提示词</b>
+                                </span>
+                              )}
+                              <span className="graph-node-status">
+                                {runRecord?.message || diagnostic?.issues[0]?.label || '结构稳定'}
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                    <div className="story-canvas-minimap" aria-hidden="true">
+                      {storyCanvasNodes.map(({ node, x, y }) => (
+                        <span
+                          className={node.id === selectedNodeId ? 'selected' : ''}
+                          key={node.id}
+                          style={{
+                            left: `${Math.min(92, Math.max(4, (x / storyCanvasSize.width) * 100))}%`,
+                            top: `${Math.min(86, Math.max(8, (y / storyCanvasSize.height) * 100))}%`,
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {showLibtvAddMenu && (
+                  <div className="libtv-add-node-menu" aria-label="添加节点菜单">
+                    <span>添加节点</span>
+                    {libtvAddNodeRows
+                      .filter((item) => item.section === 'node')
+                      .map((item) => (
+                        <button key={item.label} type="button" onClick={() => runLibtvAddNodeAction(item.action)}>
+                          <span>{item.icon}</span>
+                          <strong>{item.label}</strong>
+                          {item.tag && <small>{item.tag}</small>}
+                          <em>{item.detail}</em>
+                        </button>
+                      ))}
+                    <span>添加资源</span>
+                    {libtvAddNodeRows
+                      .filter((item) => item.section === 'resource')
+                      .map((item) => (
+                        <button key={item.label} type="button" onClick={() => runLibtvAddNodeAction(item.action)}>
+                          <span>{item.icon}</span>
+                          <strong>{item.label}</strong>
+                          {item.tag && <small>{item.tag}</small>}
+                          <em>{item.detail}</em>
+                        </button>
+                      ))}
+                  </div>
+                )}
+
+                <div className="libtv-bottom-toolbar" aria-label="画布工具条">
+                  <button
+                    className={showLibtvAddMenu ? 'active' : ''}
+                    type="button"
+                    onClick={() => setShowLibtvAddMenu((current) => !current)}
+                    aria-label="添加节点"
+                    aria-expanded={showLibtvAddMenu}
+                  >
+                    <Plus size={18} />
+                  </button>
+                  <button
+                    className={libtvDrawerTab === 'node' ? 'active' : ''}
+                    type="button"
+                    onClick={() => setLibtvDrawerTab('node')}
+                    aria-label="节点参数"
+                  >
+                    <FileText size={18} />
+                  </button>
+                  <button
+                    className={libtvDrawerTab === 'toolbox' ? 'active' : ''}
+                    type="button"
+                    onClick={() => setLibtvDrawerTab('toolbox')}
+                    aria-label="工具箱"
+                  >
+                    <Zap size={18} />
+                  </button>
+                  <button
+                    className={libtvDrawerTab === 'assets' ? 'active' : ''}
+                    type="button"
+                    onClick={() => setLibtvDrawerTab('assets')}
+                    aria-label="素材库"
+                  >
+                    <Layers3 size={18} />
+                  </button>
+                  <button
+                    className={libtvDrawerTab === 'history' ? 'active' : ''}
+                    type="button"
+                    onClick={() => setLibtvDrawerTab('history')}
+                    aria-label="历史记录"
+                  >
+                    <RotateCcw size={18} />
+                  </button>
+                  <button type="button" onClick={() => startCanvasEdgeDraft(selectedNode.id)} aria-label="连线">
+                    <GitBranch size={18} />
+                  </button>
+                  <button type="button" onClick={resetStoryCanvasView} aria-label="整理画布">
+                    <Grid3x3 size={18} />
+                  </button>
+                  <button type="button" onClick={() => setAiState('快捷键：生成、连线、预览、发布已收进画布工具条')} aria-label="快捷键">
+                    <TerminalSquare size={18} />
+                  </button>
+                  <button type="button" onClick={() => setActiveStudioPage('publish')} aria-label="发布">
+                    <Share2 size={18} />
+                  </button>
+                </div>
+              </main>
+
+              <aside className="libtv-canvas-drawer" aria-label="资产和生成记录">
+                <div className="libtv-drawer-tabs">
+                  <button
+                    className={libtvDrawerTab === 'node' ? 'active' : ''}
+                    type="button"
+                    onClick={() => setLibtvDrawerTab('node')}
+                  >
+                    节点
+                  </button>
+                  <button
+                    className={libtvDrawerTab === 'assets' ? 'active' : ''}
+                    type="button"
+                    onClick={() => setLibtvDrawerTab('assets')}
+                  >
+                    资产
+                  </button>
+                  <button
+                    className={libtvDrawerTab === 'history' ? 'active' : ''}
+                    type="button"
+                    onClick={() => setLibtvDrawerTab('history')}
+                  >
+                    记录
+                  </button>
+                  <button
+                    className={libtvDrawerTab === 'toolbox' ? 'active' : ''}
+                    type="button"
+                    onClick={() => setLibtvDrawerTab('toolbox')}
+                  >
+                    工具箱
+                  </button>
+                </div>
+                <div className="libtv-drawer-search">
+                  <input
+                    placeholder={
+                      libtvDrawerTab === 'history'
+                        ? '搜索生成记录'
+                        : libtvDrawerTab === 'toolbox'
+                          ? '搜索工具模板'
+                          : libtvDrawerTab === 'node'
+                            ? '当前节点参数'
+                            : '请输入搜索内容'
+                    }
+                    aria-label="搜索资产"
+                  />
+                  <Search size={14} />
+                </div>
+                {libtvDrawerTab === 'node' && (
+                  <div className="libtv-node-inspector">
+                    <div className="section-title light">
+                      <span>当前节点</span>
+                      <em>{selectedNodeDiagnostic.readiness}% 就绪</em>
+                    </div>
+                    <div className="libtv-node-form">
+                      <label>
+                        <span>标题</span>
+                        <input
+                          value={selectedNode.title}
+                          onChange={(event) => updateSelectedNode('title', event.target.value)}
+                        />
+                      </label>
+                      <label>
+                        <span>类型</span>
+                        <select
+                          value={selectedNode.kind}
+                          onChange={(event) => updateSelectedNode('kind', event.target.value as StoryNode['kind'])}
+                        >
+                          {nodeKinds.map((kind) => (
+                            <option key={kind} value={kind}>
+                              {kind}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        <span>执行类型</span>
+                        <select
+                          value={selectedLibtvNodeType}
+                          onChange={(event) =>
+                            updateSelectedNode('nodeType', event.target.value as LibtvNodeType)
+                          }
+                        >
+                          {libtvNodeTypes.map((type) => (
+                            <option key={type} value={type}>
+                              {libtvNodeTypeLabels[type]}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        <span>指标</span>
+                        <input
+                          value={selectedNode.metric}
+                          onChange={(event) => updateSelectedNode('metric', event.target.value)}
+                        />
+                      </label>
+                      <label>
+                        <span>模型</span>
+                        <input
+                          value={selectedNode.model || libtvNodeTypeModels[selectedLibtvNodeType]}
+                          onChange={(event) => updateSelectedNode('model', event.target.value)}
+                        />
+                      </label>
+                      <label>
+                        <span>付费模式</span>
+                        <select
+                          value={selectedNodePaywallMode}
+                          onChange={(event) =>
+                            updateNodePaywall(selectedNode.id, event.target.value as NodePaywall)
+                          }
+                          disabled={selectedNode.kind !== 'Ending'}
+                        >
+                          <option value="free">免费</option>
+                          <option value="paid">付费</option>
+                        </select>
+                      </label>
+                      <label className="wide">
+                        <span>摘要</span>
+                        <textarea
+                          value={selectedNode.summary}
+                          onChange={(event) => updateSelectedNode('summary', event.target.value)}
+                        />
+                      </label>
+                      <label className="wide">
+                        <span>Prompt / 输入</span>
+                        <textarea
+                          value={selectedNode.prompt || ''}
+                          onChange={(event) => updateSelectedNode('prompt', event.target.value)}
+                          placeholder="留空时使用节点摘要和画布一句话想法"
+                        />
+                      </label>
+                    </div>
+                    <div className={`libtv-node-run-card ${selectedNodeRunRecord.status}`}>
+                      <div>
+                        <span>执行状态</span>
+                        <strong>{selectedNodeRunRecord.message}</strong>
+                        <em>{selectedNodeRunRecord.outputPreview}</em>
+                      </div>
+                      <b>{selectedNodeRunRecord.progress}%</b>
+                      <div className="libtv-run-progress" aria-hidden="true">
+                        <span style={{ width: `${selectedNodeRunRecord.progress}%` }} />
+                      </div>
+                    </div>
+                    <div className="libtv-node-parameter-list">
+                      {selectedNodeParameterRows.map((item) => (
+                        <article key={item.label}>
+                          <span>{item.label}</span>
+                          <em>{item.value}</em>
+                        </article>
+                      ))}
+                    </div>
+                    <div className="story-canvas-inspector-metrics">
+                      <article>
+                        <span>入站</span>
+                        <strong>{selectedNodeIncoming.length}</strong>
+                      </article>
+                      <article>
+                        <span>出站</span>
+                        <strong>{selectedNode.choices.length}</strong>
+                      </article>
+                      <article>
+                        <span>问题</span>
+                        <strong>{selectedNodeDiagnostic.issues.length}</strong>
+                      </article>
+                    </div>
+                    <div className="story-canvas-readiness">
+                      {selectedNodeReadiness.map((item) => (
+                        <span className={item.done ? 'ready' : 'waiting'} key={item.label}>
+                          {item.done ? 'OK' : '-'} {item.label}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="story-canvas-inspector-actions">
+                      <button type="button" onClick={() => startCanvasEdgeDraft(selectedNode.id)}>
+                        <GitBranch size={14} />
+                        连线
+                      </button>
+                      <button type="button" onClick={previewSelectedNode}>
+                        <Play size={14} fill="currentColor" />
+                        预览
+                      </button>
+                      <button type="button" onClick={() => generatePaidHiddenLine()}>
+                        <KeyRound size={14} />
+                        付费线
+                      </button>
+                      <button type="button" onClick={() => void runCanvasNode(selectedNode.id)}>
+                        <Sparkles size={14} />
+                        运行
+                      </button>
+                      <button type="button" onClick={() => assetUploadInputRef.current?.click()}>
+                        <Upload size={14} />
+                        上传
+                      </button>
+                    </div>
+                    <div className="story-canvas-choice-list">
+                      <span>出站选择</span>
+                      {selectedNodeBranchRows.length === 0 ? (
+                        <article>
+                          <strong>{selectedNode.kind === 'Ending' ? '结局节点' : '暂无分支'}</strong>
+                          <em>{selectedNode.kind === 'Ending' ? '已收束' : '双击画布或点击连线补后续'}</em>
+                        </article>
+                      ) : (
+                        selectedNodeBranchRows.map((row) => (
+                          <article className={`story-canvas-choice-card ${row.status}`} key={row.id}>
+                            <label>
+                              <span>选择文案</span>
+                              <input
+                                value={selectedNode.choices[row.index]?.label || ''}
+                                onChange={(event) => updateChoice(row.index, 'label', event.target.value)}
+                              />
+                            </label>
+                            <label>
+                              <span>目标节点</span>
+                              <select
+                                value={selectedNode.choices[row.index]?.targetNodeId || ''}
+                                onChange={(event) => updateChoice(row.index, 'targetNodeId', event.target.value)}
+                              >
+                                {storyNodes.map((node) => (
+                                  <option key={node.id} value={node.id}>
+                                    {node.id} · {node.title}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <div className="story-canvas-choice-actions">
+                              <button type="button" onClick={() => applyChoiceLabelSuggestion(row.index)}>
+                                优化
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => previewChoiceRoute(selectedNode.choices[row.index])}
+                              >
+                                预览
+                              </button>
+                              <button
+                                className="danger"
+                                type="button"
+                                aria-label="删除分支"
+                                onClick={() => removeChoice(row.index)}
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                            <em>{row.stateLabel} · {row.conditionLabel}</em>
+                          </article>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+                {libtvDrawerTab === 'assets' && (
+                  <div className="libtv-asset-list">
+                    {libtvAssetRows.map((item) => (
+                      <article key={item.title}>
+                        <span>{item.title}</span>
+                        <strong>{item.meta}</strong>
+                        <em>{item.state}</em>
+                        <button type="button" onClick={item.action}>{item.actionLabel}</button>
+                      </article>
+                    ))}
+                  </div>
+                )}
+                {libtvDrawerTab === 'history' && (
+                  <div className="libtv-asset-list libtv-history-list">
+                    <div className="libtv-execution-list">
+                      <span>执行队列</span>
+                      {nodeExecutionRows.map((row) => (
+                        <button
+                          className={row.status}
+                          key={row.id}
+                          type="button"
+                          onClick={() => {
+                            focusStoryNode(row.id, `已定位执行节点 ${row.id}`)
+                            setLibtvDrawerTab('node')
+                          }}
+                        >
+                          <strong>{row.id} · {row.title}</strong>
+                          <em>{libtvNodeTypeLabels[row.type]} · {row.message}</em>
+                          <small>{row.progress}%</small>
+                        </button>
+                      ))}
+                    </div>
+                    {libtvHistoryRows.map((item) => (
+                      <article key={item.title}>
+                        <span>{item.title}</span>
+                        <strong>{item.meta}</strong>
+                        <em>{item.state}</em>
+                        <button type="button" onClick={item.action}>{item.actionLabel}</button>
+                      </article>
+                    ))}
+                  </div>
+                )}
+                {libtvDrawerTab === 'toolbox' && (
+                  <div className="libtv-toolbox-panel">
+                    <div className="section-title light">
+                      <span>工具箱</span>
+                      <em>常用生成能力放在画布内</em>
+                    </div>
+                    {libtvToolboxRows.map((item) => (
+                      <button key={item.title} type="button" onClick={item.action}>
+                        <Sparkles size={16} />
+                        <span>{item.title}</span>
+                        <em>{item.meta}</em>
+                        <b>{item.state}</b>
+                        <small>{item.actionLabel}</small>
+                      </button>
+                    ))}
+                    <div className="libtv-template-panel">
+                      <span>模板库</span>
+                      {studioQuickPromptPresets.map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => {
+                            setBeginnerIdea(preset)
+                            setStudioQuickPrompt(preset)
+                            setSeriesGenerator((current) => ({ ...current, idea: preset }))
+                            writeStoredValue(QUICK_PROMPT_STORAGE_KEY, preset)
+                            setAiState('模板已放入画布生成器，可直接生成普通短剧或互动短剧')
+                          }}
+                        >
+                          <FileText size={15} />
+                          <strong>{truncateProductionText(preset, '模板', 24)}</strong>
+                          <em>使用模板</em>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="libtv-stat-strip">
+                  {libtvWorkbenchStats.map((item) => (
+                    <article key={item.label}>
+                      <span>{item.label}</span>
+                      <strong>{item.value}</strong>
+                      <em>{item.note}</em>
+                    </article>
+                  ))}
+                </div>
+              </aside>
+            </div>
+            <div className="interactive-oneclick-panel" aria-label="一句话生成互动短剧">
+              <div className="interactive-oneclick-head">
+                <div>
+                  <p className="eyebrow">互动短剧一键生成</p>
+                  <h2>像生成普通短剧一样生成互动短剧</h2>
+                  <span>{interactiveQuickState}</span>
+                </div>
+                <button
+                  className="primary-button compact"
+                  type="button"
+                  onClick={() => void generateInteractiveShortDramaProject()}
+                >
+                  <Sparkles size={16} />
+                  一键生成互动短剧
+                </button>
+              </div>
+              <div className="interactive-oneclick-layout">
+                <label className="interactive-oneclick-prompt">
+                  <span>一句话想法</span>
+                  <textarea
+                    value={beginnerIdea}
+                    onChange={(event) => {
+                      setBeginnerIdea(event.target.value)
+                      setStudioQuickPrompt(event.target.value)
+                      setSeriesGenerator((current) => ({ ...current, idea: event.target.value }))
+                      writeStoredValue(QUICK_PROMPT_STORAGE_KEY, event.target.value)
+                    }}
+                    placeholder="例如：女主每次接到午夜电话都会回到三分钟前"
+                  />
+                </label>
+                <div className="interactive-oneclick-options">
+                  <div className="interactive-oneclick-row" role="group" aria-label="互动短剧类型">
+                    <span>类型</span>
+                    <div>
+                      {beginnerGenreOptions.map((option) => (
+                        <button
+                          className={beginnerGenre === option ? 'active' : ''}
+                          key={option}
+                          type="button"
+                          aria-pressed={beginnerGenre === option}
+                          onClick={() => setBeginnerGenre(option)}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="interactive-oneclick-row" role="group" aria-label="互动短剧时长">
+                    <span>时长</span>
+                    <div>
+                      {beginnerLengthOptions.map((option) => (
+                        <button
+                          className={beginnerLength === option ? 'active' : ''}
+                          key={option}
+                          type="button"
+                          aria-pressed={beginnerLength === option}
+                          onClick={() => setBeginnerLength(option)}
+                        >
+                          {option}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="interactive-oneclick-goals" role="group" aria-label="互动短剧目标">
+                    {beginnerGoalOptions.map((option) => (
+                      <button
+                        className={beginnerGoal === option.id ? 'active' : ''}
+                        key={option.id}
+                        type="button"
+                        aria-pressed={beginnerGoal === option.id}
+                        onClick={() => setBeginnerGoal(option.id)}
+                      >
+                        <strong>{option.label}</strong>
+                        <em>{option.detail}</em>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="interactive-oneclick-result-grid">
+                {interactiveQuickRows.map((item) => (
+                  <article className={item.tone} key={item.label}>
+                    <span>{item.label}</span>
+                    <strong>{item.value}</strong>
+                    <em>{item.note}</em>
+                  </article>
+                ))}
+              </div>
+              <div className="interactive-oneclick-flow">
+                {[
+                  ['01', '输入一句话'],
+                  ['02', '自动拆节点'],
+                  ['03', '生成选择分支'],
+                  ['04', '直接试玩发布'],
+                ].map(([step, title]) => (
+                  <span key={step}>
+                    <b>{step}</b>
+                    {title}
+                  </span>
+                ))}
+              </div>
+            </div>
             <div className="panel-header">
               <div>
                 <p className="eyebrow">剧情图谱</p>
@@ -12289,33 +14399,216 @@ function StudioApp() {
               ))}
             </div>
 
-            <div className="graph-canvas" aria-label="Story graph canvas">
-              {storyNodes.map((node) => {
-                const diagnostic = storyDiagnosticByNodeId.get(node.id)
-
-                return (
-                  <button
-                    className={`graph-node ${node.id === selectedNodeId ? 'selected' : ''} ${
-                      diagnostic?.status || 'clean'
-                    }`}
-                    key={node.id}
-                    type="button"
-                    onClick={() => setSelectedNodeId(node.id)}
-                  >
-                    <span>{node.id}</span>
-                    <strong>{node.title}</strong>
-                    <em>{node.kind}</em>
-                    <small>
-                      {node.choices.length > 0
-                        ? node.choices.map((item) => item.targetNodeId).join(' / ')
-                        : '暂无后续节点'}
-                    </small>
-                    <span className="graph-node-status">
-                      {diagnostic?.issues[0]?.label || '结构稳定'}
-                    </span>
+            <div
+              className={`graph-canvas live-canvas ${storyCanvasDrag ? `dragging-${storyCanvasDrag.kind}` : ''}`}
+              aria-label="Story graph canvas"
+            >
+              <div className="story-canvas-toolbar">
+                <div>
+                  <span>{storyEdgeDraftSourceId ? `连线模式：${storyEdgeDraftSourceId}` : '导演台画布'}</span>
+                  <strong>
+                    {storyEdgeDraftSourceId
+                      ? '点击目标节点创建分支'
+                      : `${storyCanvasNodes.length} 节点 · ${storyCanvasEdges.length} 连线`}
+                  </strong>
+                </div>
+                <div className="story-canvas-controls">
+                  <button type="button" onClick={() => updateStoryCanvasZoom(-0.1)} aria-label="缩小画布">
+                    <Minus size={15} />
                   </button>
-                )
-              })}
+                  <span>{Math.round(storyCanvasZoom * 100)}%</span>
+                  <button type="button" onClick={() => updateStoryCanvasZoom(0.1)} aria-label="放大画布">
+                    <Plus size={15} />
+                  </button>
+                  <button type="button" onClick={resetStoryCanvasView}>
+                    <RotateCcw size={15} />
+                    重置
+                  </button>
+                </div>
+              </div>
+              <div
+                className="story-canvas-viewport"
+                onPointerDown={startStoryCanvasPan}
+                onWheel={handleStoryCanvasWheel}
+              >
+                <div
+                  className="story-canvas-stage"
+                  style={{
+                    width: `${storyCanvasSize.width}px`,
+                    height: `${storyCanvasSize.height}px`,
+                    transform: `translate(${storyCanvasPan.x}px, ${storyCanvasPan.y}px) scale(${storyCanvasZoom})`,
+                  }}
+                >
+                  <svg
+                    className="story-canvas-edges"
+                    viewBox={`0 0 ${storyCanvasSize.width} ${storyCanvasSize.height}`}
+                    aria-hidden="true"
+                  >
+                    <defs>
+                      <marker
+                        id="storyCanvasArrow"
+                        markerHeight="8"
+                        markerWidth="8"
+                        orient="auto"
+                        refX="7"
+                        refY="4"
+                      >
+                        <path d="M 0 0 L 8 4 L 0 8 z" />
+                      </marker>
+                    </defs>
+                    {storyCanvasEdges.map((edge) => (
+                      <g className={`story-canvas-edge ${edge.tone}`} key={edge.id}>
+                        <path d={edge.path} markerEnd="url(#storyCanvasArrow)" />
+                        <text x={edge.labelX} y={edge.labelY - 10}>
+                          {edge.label}
+                        </text>
+                      </g>
+                    ))}
+                  </svg>
+                  {storyCanvasNodes.map(({ node, diagnostic, x, y }) => (
+                    <button
+                      className={`graph-node ${node.id === selectedNodeId ? 'selected' : ''} ${
+                        node.id === storyEdgeDraftSourceId ? 'edge-source' : ''
+                      } ${
+                        storyEdgeDraftSourceId && node.id !== storyEdgeDraftSourceId ? 'edge-target' : ''
+                      } ${
+                        diagnostic?.status || 'clean'
+                      }`}
+                      key={node.id}
+                      type="button"
+                      style={{
+                        left: `${x}px`,
+                        top: `${y}px`,
+                        width: `${storyCanvasNodeWidth}px`,
+                        minHeight: `${storyCanvasNodeHeight}px`,
+                      }}
+                      onClick={() => {
+                        if (connectCanvasEdgeTarget(node.id)) return
+                        setSelectedNodeId(node.id)
+                      }}
+                      onPointerDown={(event) => startStoryNodeDrag(event, node.id)}
+                    >
+                      <span>{node.id}</span>
+                      <strong>{node.title}</strong>
+                      <em>{node.kind}</em>
+                      <small>
+                        {node.choices.length > 0
+                          ? node.choices.map((item) => item.targetNodeId).join(' / ')
+                          : '暂无后续节点'}
+                      </small>
+                      <span className="graph-node-status">
+                        {diagnostic?.issues[0]?.label || '结构稳定'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <aside className="story-canvas-inspector">
+                <div className="story-canvas-inspector-head">
+                  <span>当前节点</span>
+                  <strong>{selectedNode.id} · {selectedNode.title}</strong>
+                  <em>{selectedNode.kind} · {selectedNode.metric || '指标待补'}</em>
+                </div>
+                <div className="story-canvas-inspector-metrics">
+                  <article>
+                    <span>就绪</span>
+                    <strong>{selectedNodeDiagnostic.readiness}%</strong>
+                  </article>
+                  <article>
+                    <span>入站</span>
+                    <strong>{selectedNodeIncoming.length}</strong>
+                  </article>
+                  <article>
+                    <span>出站</span>
+                    <strong>{selectedNode.choices.length}</strong>
+                  </article>
+                </div>
+                <div className="story-canvas-readiness">
+                  {selectedNodeReadiness.map((item) => (
+                    <span className={item.done ? 'ready' : 'waiting'} key={item.label}>
+                      {item.done ? 'OK' : '-'} {item.label}
+                    </span>
+                  ))}
+                </div>
+                <div className="story-canvas-inspector-actions">
+                  <button type="button" onClick={() => startCanvasEdgeDraft(selectedNode.id)}>
+                    <GitBranch size={14} />
+                    从此节点连线
+                  </button>
+                  {storyEdgeDraftSourceId && (
+                    <button type="button" onClick={() => setStoryEdgeDraftSourceId(null)}>
+                      <RotateCcw size={14} />
+                      取消连线
+                    </button>
+                  )}
+                </div>
+                <div className="story-canvas-choice-list">
+                  <span>出站选择</span>
+                  {selectedNodeBranchRows.length === 0 ? (
+                    <article>
+                      <strong>{selectedNode.kind === 'Ending' ? '结局节点' : '暂无分支'}</strong>
+                      <em>{selectedNode.kind === 'Ending' ? '已收束' : '需要补后续选择'}</em>
+                    </article>
+                  ) : (
+                    selectedNodeBranchRows.map((row) => (
+                      <article className={`story-canvas-choice-card ${row.status}`} key={row.id}>
+                        <label>
+                          <span>选择文案</span>
+                          <input
+                            value={selectedNode.choices[row.index]?.label || ''}
+                            onChange={(event) => updateChoice(row.index, 'label', event.target.value)}
+                          />
+                        </label>
+                        <label>
+                          <span>目标节点</span>
+                          <select
+                            value={selectedNode.choices[row.index]?.targetNodeId || ''}
+                            onChange={(event) => updateChoice(row.index, 'targetNodeId', event.target.value)}
+                          >
+                            {storyNodes.map((node) => (
+                              <option key={node.id} value={node.id}>
+                                {node.id} · {node.title}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <div className="story-canvas-choice-actions">
+                          <button type="button" onClick={() => applyChoiceLabelSuggestion(row.index)}>
+                            优化
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => previewChoiceRoute(selectedNode.choices[row.index])}
+                          >
+                            预览
+                          </button>
+                          <button
+                            className="danger"
+                            type="button"
+                            aria-label="删除分支"
+                            onClick={() => removeChoice(row.index)}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                        <em>{row.stateLabel} · {row.conditionLabel}</em>
+                      </article>
+                    ))
+                  )}
+                </div>
+              </aside>
+              <div className="story-canvas-minimap" aria-hidden="true">
+                {storyCanvasNodes.map(({ node, x, y }) => (
+                  <span
+                    className={node.id === selectedNodeId ? 'selected' : ''}
+                    key={node.id}
+                    style={{
+                      left: `${Math.min(92, Math.max(4, (x / storyCanvasSize.width) * 100))}%`,
+                      top: `${Math.min(86, Math.max(8, (y / storyCanvasSize.height) * 100))}%`,
+                    }}
+                  />
+                ))}
+              </div>
             </div>
             <div className="story-route-board" aria-label="Story route review">
               {storyRouteStages.map((item, index) => (
@@ -14017,6 +16310,39 @@ function StudioApp() {
               </div>
             </section>
 
+            {/* AI Video Generation */}
+            <section className={pagePanelClass('panel editor-panel video-panel', ['video'])}>
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">{studioPageCopy.video.eyebrow}</p>
+                  <h2>{studioPageCopy.video.title}</h2>
+                </div>
+              </div>
+              <AiVideoGenerator />
+            </section>
+
+            {/* Storyboard Design */}
+            <section className={pagePanelClass('panel editor-panel storyboard-panel', ['storyboard'])}>
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">{studioPageCopy.storyboard.eyebrow}</p>
+                  <h2>{studioPageCopy.storyboard.title}</h2>
+                </div>
+              </div>
+              <StoryboardDesigner />
+            </section>
+
+            {/* Skills Marketplace */}
+            <section className={pagePanelClass('panel editor-panel skills-panel', ['skills'])}>
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">{studioPageCopy.skills.eyebrow}</p>
+                  <h2>{studioPageCopy.skills.title}</h2>
+                </div>
+              </div>
+              <SkillsMarketplace />
+            </section>
+
             <section className={pagePanelClass('panel editor-panel lead-panel', ['overview'])}>
               <div className="panel-header">
                 <div>
@@ -14929,9 +17255,12 @@ function StudioApp() {
             </section>
           </aside>
         </div>
+        )}
       </section>
     </main>
   )
 }
 
 export default App
+
+export { StudioApp }

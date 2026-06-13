@@ -2,7 +2,6 @@
 // In production, this should send errors to a monitoring service (Sentry, etc.)
 export function logError(context: string, error: unknown): void {
   if (import.meta.env.DEV || import.meta.env.MODE === 'development') {
-    // eslint-disable-next-line no-console
     console.error(`[${context}]`, error)
   }
   // TODO: Integrate with Sentry/LogRocket in production
@@ -11,14 +10,12 @@ export function logError(context: string, error: unknown): void {
 
 export function logWarn(context: string, message: string, data?: unknown): void {
   if (import.meta.env.DEV || import.meta.env.MODE === 'development') {
-    // eslint-disable-next-line no-console
     console.warn(`[${context}]`, message, data ?? '')
   }
 }
 
 export function logInfo(context: string, message: string, data?: unknown): void {
   if (import.meta.env.DEV || import.meta.env.MODE === 'development') {
-    // eslint-disable-next-line no-console
     console.info(`[${context}]`, message, data ?? '')
   }
 }

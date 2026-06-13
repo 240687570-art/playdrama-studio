@@ -225,6 +225,63 @@ create table if not exists final_video_renders (
   completed_at timestamptz
 );
 
+create table if not exists canvas_assets (
+  id text primary key,
+  workspace_id text not null references workspaces(id),
+  project_id text not null references projects(id),
+  node_id text,
+  type text not null default 'script',
+  name text not null default '',
+  meta text not null default '',
+  source text not null default '',
+  status text not null default 'ready',
+  file_name text not null default '',
+  mime_type text not null default '',
+  size bigint not null default 0,
+  url text not null default '',
+  created_by text references app_users(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists canvas_node_runs (
+  id text primary key,
+  workspace_id text not null references workspaces(id),
+  project_id text not null references projects(id),
+  node_id text not null,
+  node_title text not null default '',
+  node_type text not null default 'text',
+  asset_id text references canvas_assets(id),
+  status text not null default 'succeeded',
+  progress integer not null default 100,
+  message text not null default '',
+  output_title text not null default '',
+  output_preview text not null default '',
+  model text not null default '',
+  prompt text not null default '',
+  credits integer not null default 0,
+  created_by text references app_users(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists canvas_workflow_runs (
+  id text primary key,
+  workspace_id text not null references workspaces(id),
+  project_id text not null references projects(id),
+  status text not null default 'running',
+  scope text not null default 'all',
+  start_node_id text not null default '',
+  node_ids jsonb not null default '[]'::jsonb,
+  run_ids jsonb not null default '[]'::jsonb,
+  credits integer not null default 0,
+  message text not null default '',
+  created_by text references app_users(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  completed_at timestamptz
+);
+
 create table if not exists audit_log (
   id text primary key,
   user_id text not null references app_users(id),
@@ -359,6 +416,21 @@ create index if not exists idx_final_video_renders_project_created
 
 create index if not exists idx_final_video_renders_status_updated
   on final_video_renders (status, updated_at desc);
+
+create index if not exists idx_canvas_assets_project_created
+  on canvas_assets (project_id, created_at desc);
+
+create index if not exists idx_canvas_assets_node_created
+  on canvas_assets (node_id, created_at desc);
+
+create index if not exists idx_canvas_node_runs_project_updated
+  on canvas_node_runs (project_id, updated_at desc);
+
+create index if not exists idx_canvas_node_runs_node_updated
+  on canvas_node_runs (node_id, updated_at desc);
+
+create index if not exists idx_canvas_workflow_runs_project_updated
+  on canvas_workflow_runs (project_id, updated_at desc);
 
 create index if not exists idx_audit_workspace_created
   on audit_log (workspace_id, created_at desc);

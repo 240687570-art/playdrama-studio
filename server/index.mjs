@@ -665,6 +665,9 @@ function normalizeDatabase(data) {
     finalVideoRenders: Array.isArray(data.finalVideoRenders)
       ? data.finalVideoRenders
       : [],
+    canvasAssets: Array.isArray(data.canvasAssets) ? data.canvasAssets : [],
+    canvasNodeRuns: Array.isArray(data.canvasNodeRuns) ? data.canvasNodeRuns : [],
+    canvasWorkflowRuns: Array.isArray(data.canvasWorkflowRuns) ? data.canvasWorkflowRuns : [],
     auditLog: Array.isArray(data.auditLog) ? data.auditLog : [],
     inviteEmailDeliveries: Array.isArray(data.inviteEmailDeliveries)
       ? data.inviteEmailDeliveries
@@ -714,6 +717,7 @@ async function loadPostgresDatabase() {
   const pool = await getPgPool()
   await ensureAiGenerationJobsTable()
   await ensureFinalVideoRendersTable()
+  await ensureCanvasRuntimeTables()
   const [
     usersResult,
     workspacesResult,
@@ -728,6 +732,9 @@ async function loadPostgresDatabase() {
     distributionJobsResult,
     videoGenerationJobsResult,
     finalVideoRendersResult,
+    canvasAssetsResult,
+    canvasNodeRunsResult,
+    canvasWorkflowRunsResult,
     auditResult,
     inviteEmailDeliveriesResult,
     authEmailCodesResult,
@@ -978,6 +985,69 @@ async function loadPostgresDatabase() {
     pool.query(`
       select
         id,
+        workspace_id as "workspaceId",
+        project_id as "projectId",
+        node_id as "nodeId",
+        type,
+        name,
+        meta,
+        source,
+        status,
+        file_name as "fileName",
+        mime_type as "mimeType",
+        size,
+        url,
+        created_by as "createdBy",
+        created_at as "createdAt",
+        updated_at as "updatedAt"
+      from canvas_assets
+      order by created_at asc
+    `),
+    pool.query(`
+      select
+        id,
+        workspace_id as "workspaceId",
+        project_id as "projectId",
+        node_id as "nodeId",
+        node_title as "nodeTitle",
+        node_type as "nodeType",
+        asset_id as "assetId",
+        status,
+        progress,
+        message,
+        output_title as "outputTitle",
+        output_preview as "outputPreview",
+        model,
+        prompt,
+        credits,
+        created_by as "createdBy",
+        created_at as "createdAt",
+        updated_at as "updatedAt"
+      from canvas_node_runs
+      order by created_at asc
+    `),
+    pool.query(`
+      select
+        id,
+        workspace_id as "workspaceId",
+        project_id as "projectId",
+        status,
+        scope,
+        start_node_id as "startNodeId",
+        node_ids as "nodeIds",
+        run_ids as "runIds",
+        credits,
+        message,
+        created_by as "createdBy",
+        created_at as "createdAt",
+        updated_at as "updatedAt",
+        completed_at as "completedAt"
+      from canvas_workflow_runs
+      order by created_at asc
+    `),
+    pool.query(`
+      select
+        id,
         user_id as "userId",
         workspace_id as "workspaceId",
         action,
@@ -1065,6 +1135,9 @@ async function loadPostgresDatabase() {
     distributionJobs: distributionJobsResult.rows,
     videoGenerationJobs: videoGenerationJobsResult.rows,
     finalVideoRenders: finalVideoRendersResult.rows,
+    canvasAssets: canvasAssetsResult.rows,
+    canvasNodeRuns: canvasNodeRunsResult.rows,
+    canvasWorkflowRuns: canvasWorkflowRunsResult.rows,
     auditLog: auditResult.rows,
     inviteEmailDeliveries: inviteEmailDeliveriesResult.rows,
     authEmailCodes: authEmailCodesResult.rows,
@@ -1104,6 +1177,9 @@ const paymentOrders = database.paymentOrders
 const distributionJobs = database.distributionJobs
 const videoGenerationJobs = database.videoGenerationJobs
 const finalVideoRenders = database.finalVideoRenders
+const canvasAssets = database.canvasAssets
+const canvasNodeRuns = database.canvasNodeRuns
+const canvasWorkflowRuns = database.canvasWorkflowRuns
 const auditLog = database.auditLog
 const inviteEmailDeliveries = database.inviteEmailDeliveries
 const marketingLeads = database.marketingLeads
@@ -1128,6 +1204,9 @@ function databaseSnapshot() {
     distributionJobs,
     videoGenerationJobs,
     finalVideoRenders,
+    canvasAssets,
+    canvasNodeRuns,
+    canvasWorkflowRuns,
     auditLog,
     inviteEmailDeliveries,
     marketingLeads,
@@ -1159,6 +1238,9 @@ async function savePostgresDatabase() {
     await client.query('delete from ai_generation_jobs')
     await client.query('delete from ai_usage_events')
     await client.query('delete from content_safety_reviews')
+    await client.query('delete from canvas_workflow_runs')
+    await client.query('delete from canvas_node_runs')
+    await client.query('delete from canvas_assets')
     await client.query('delete from final_video_renders')
     await client.query('delete from video_generation_jobs')
     await client.query('delete from distribution_jobs')
@@ -1472,6 +1554,84 @@ async function savePostgresDatabase() {
           item.errorMessage || null,
           item.createdAt || now(),
           item.startedAt || null,
+          item.updatedAt || item.createdAt || now(),
+          item.completedAt || null,
+        ],
+      )
+    }
+
+    for (const item of snapshot.canvasAssets) {
+      await client.query(
+        `insert into canvas_assets
+          (id, workspace_id, project_id, node_id, type, name, meta, source, status, file_name, mime_type, size, url, created_by, created_at, updated_at)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+        [
+          item.id,
+          item.workspaceId,
+          item.projectId,
+          item.nodeId || null,
+          item.type || 'script',
+          item.name || '',
+          item.meta || '',
+          item.source || '',
+          item.status || 'ready',
+          item.fileName || '',
+          item.mimeType || '',
+          Number(item.size || 0),
+          item.url || '',
+          item.createdBy || user.id,
+          item.createdAt || now(),
+          item.updatedAt || item.createdAt || now(),
+        ],
+      )
+    }
+
+    for (const item of snapshot.canvasNodeRuns) {
+      await client.query(
+        `insert into canvas_node_runs
+          (id, workspace_id, project_id, node_id, node_title, node_type, asset_id, status, progress, message, output_title, output_preview, model, prompt, credits, created_by, created_at, updated_at)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+        [
+          item.id,
+          item.workspaceId,
+          item.projectId,
+          item.nodeId,
+          item.nodeTitle || '',
+          item.nodeType || 'text',
+          item.assetId || null,
+          item.status || 'succeeded',
+          Number(item.progress || 100),
+          item.message || '',
+          item.outputTitle || '',
+          item.outputPreview || '',
+          item.model || '',
+          item.prompt || '',
+          Number(item.credits || 0),
+          item.createdBy || user.id,
+          item.createdAt || now(),
+          item.updatedAt || item.createdAt || now(),
+        ],
+      )
+    }
+
+    for (const item of snapshot.canvasWorkflowRuns) {
+      await client.query(
+        `insert into canvas_workflow_runs
+          (id, workspace_id, project_id, status, scope, start_node_id, node_ids, run_ids, credits, message, created_by, created_at, updated_at, completed_at)
+         values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, $14)`,
+        [
+          item.id,
+          item.workspaceId,
+          item.projectId,
+          item.status || 'succeeded',
+          item.scope || 'all',
+          item.startNodeId || '',
+          JSON.stringify(item.nodeIds || []),
+          JSON.stringify(item.runIds || []),
+          Number(item.credits || 0),
+          item.message || '',
+          item.createdBy || user.id,
+          item.createdAt || now(),
           item.updatedAt || item.createdAt || now(),
           item.completedAt || null,
         ],
@@ -4320,7 +4480,7 @@ async function createProject(actorUserId, workspaceId, input) {
     modelRouting: input.modelRouting || {
       market: 'China Mainland',
       defaultProvider: 'DeepSeek / Qwen / Doubao / GLM',
-      openaiPolicy: 'Disabled for China public launch',
+      openaiPolicy: 'Enabled for development',
       contentSafety: 'Required',
       fallbackProvider: 'Kimi / MiniMax / Tencent Hunyuan',
     },
@@ -5501,6 +5661,266 @@ function videoProviderStatus() {
     },
     routingPolicy: 'PlayDrama keeps interaction, payment, publishing, and analytics; video providers only render shots.',
   }
+}
+
+const canvasNodeTypeLabels = {
+  text: '文本',
+  image: '图片',
+  video: '视频',
+  audio: '音频',
+  composite: '视频合成',
+  director: '导演台',
+  script: '脚本',
+}
+
+const canvasNodeTypeModels = {
+  text: 'Story Writer',
+  image: 'Image Reference',
+  video: 'Video Prompt',
+  audio: 'Voice & BGM',
+  composite: 'Final Composer',
+  director: 'Director Board',
+  script: 'Script Engine',
+}
+
+function normalizeCanvasNodeType(value = '', nodeKind = 'Choice') {
+  const type = String(value || '').trim()
+  if (canvasNodeTypeLabels[type]) return type
+  if (nodeKind === 'Hook') return 'script'
+  if (nodeKind === 'Puzzle') return 'director'
+  if (nodeKind === 'Ending') return 'composite'
+  return 'text'
+}
+
+function canvasNodeCreditCost(nodeType) {
+  if (nodeType === 'video') return 4
+  if (nodeType === 'composite') return 3
+  if (nodeType === 'image') return 2
+  return 1
+}
+
+function listCanvasAssets(projectId) {
+  return canvasAssets
+    .filter((asset) => asset.projectId === projectId)
+    .slice()
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+}
+
+function listCanvasNodeRuns(projectId) {
+  return canvasNodeRuns
+    .filter((run) => run.projectId === projectId)
+    .slice()
+    .sort((left, right) => new Date(right.updatedAt || right.createdAt).getTime() - new Date(left.updatedAt || left.createdAt).getTime())
+}
+
+function buildCanvasNodeOutput(project, node, input = {}) {
+  const nodeType = normalizeCanvasNodeType(input.nodeType || node.nodeType, node.kind)
+  const prompt = String(input.prompt || node.prompt || node.summary || project.title || '').trim()
+  const label = canvasNodeTypeLabels[nodeType]
+  const previewSeed = compactVideoPromptLine(prompt || node.summary || '画布输入', 160)
+  if (nodeType === 'image') {
+    return {
+      title: `${node.title} · 图片资产`,
+      preview: `生成角色图、海报或分镜参考：${previewSeed}`,
+      assetType: 'image',
+    }
+  }
+  if (nodeType === 'video') {
+    return {
+      title: `${node.title} · 视频镜头`,
+      preview: `生成镜头运动、画面提示和视频队列：${previewSeed}`,
+      assetType: 'video',
+    }
+  }
+  if (nodeType === 'audio') {
+    return {
+      title: `${node.title} · 音频方案`,
+      preview: `生成旁白、音效和 BGM 方向：${previewSeed}`,
+      assetType: 'audio',
+    }
+  }
+  if (nodeType === 'composite') {
+    return {
+      title: `${node.title} · 合成清单`,
+      preview: `合成片段、字幕、音频和导出规格：${previewSeed}`,
+      assetType: 'composite',
+    }
+  }
+  return {
+    title: `${node.title} · ${label}结果`,
+    preview: `生成剧本正文、选择文案和可执行 Prompt：${previewSeed}`,
+    assetType: 'script',
+  }
+}
+
+async function createCanvasAsset(actorUserId, project, input = {}, options = {}) {
+  const createdAt = now()
+  const type = ['script', 'image', 'video', 'audio', 'composite'].includes(input.type)
+    ? input.type
+    : 'script'
+  const asset = {
+    id: input.id || `asset_${randomUUID()}`,
+    projectId: project.id,
+    workspaceId: project.workspaceId,
+    nodeId: input.nodeId || null,
+    type,
+    name: String(input.name || `${project.title} 素材`).slice(0, 120),
+    meta: String(input.meta || type).slice(0, 160),
+    source: String(input.source || '').slice(0, 3000),
+    status: ['ready', 'processing', 'failed'].includes(input.status) ? input.status : 'ready',
+    fileName: input.fileName ? String(input.fileName).slice(0, 240) : '',
+    mimeType: input.mimeType ? String(input.mimeType).slice(0, 120) : '',
+    size: Number.isFinite(Number(input.size)) ? Number(input.size) : 0,
+    url: input.url ? String(input.url).slice(0, 1000) : '',
+    createdBy: actorUserId,
+    createdAt,
+    updatedAt: createdAt,
+  }
+  canvasAssets.unshift(asset)
+  recordAudit(actorUserId, 'canvas.asset_created', 'project', project.id, {
+    assetId: asset.id,
+    type: asset.type,
+    name: asset.name,
+  })
+  if (options.persist !== false) await saveDatabase()
+  return asset
+}
+
+async function createCanvasNodeRun(actorUserId, project, nodeId, input = {}, options = {}) {
+  const node = Array.isArray(project.nodes)
+    ? project.nodes.find((item) => item.id === nodeId)
+    : null
+  if (!node) return null
+
+  const nodeType = normalizeCanvasNodeType(input.nodeType || node.nodeType, node.kind)
+  const output = buildCanvasNodeOutput(project, node, { ...input, nodeType })
+  const credits = canvasNodeCreditCost(nodeType)
+  const createdAt = now()
+  const run = {
+    id: `run_${randomUUID()}`,
+    projectId: project.id,
+    workspaceId: project.workspaceId,
+    nodeId: node.id,
+    nodeTitle: node.title,
+    nodeType,
+    status: 'succeeded',
+    progress: 100,
+    message: '后端执行完成，可复用输出',
+    outputTitle: output.title,
+    outputPreview: output.preview,
+    model: String(input.model || node.model || canvasNodeTypeModels[nodeType] || '').slice(0, 120),
+    prompt: String(input.prompt || node.prompt || node.summary || '').slice(0, 3000),
+    credits,
+    createdBy: actorUserId,
+    createdAt,
+    updatedAt: createdAt,
+  }
+  canvasNodeRuns.unshift(run)
+  const asset = await createCanvasAsset(actorUserId, project, {
+    type: output.assetType,
+    name: output.title,
+    meta: `${canvasNodeTypeLabels[nodeType]} · ${node.id}`,
+    source: output.preview,
+    nodeId: node.id,
+  }, { persist: false })
+  run.assetId = asset.id
+  recordAudit(actorUserId, 'canvas.node_run_succeeded', 'project', project.id, {
+    runId: run.id,
+    nodeId: node.id,
+    nodeType,
+    credits,
+  })
+  if (options.persist !== false) await saveDatabase()
+  return { run, asset }
+}
+
+function orderedCanvasNodes(project, startNodeId = '', scope = 'all') {
+  const nodes = Array.isArray(project.nodes) ? project.nodes : []
+  const byId = new Map(nodes.map((node) => [node.id, node]))
+  const downstream = new Set()
+  if (scope === 'downstream' && startNodeId && byId.has(startNodeId)) {
+    const queue = [startNodeId]
+    while (queue.length) {
+      const nodeId = queue.shift()
+      if (!nodeId || downstream.has(nodeId)) continue
+      downstream.add(nodeId)
+      const node = byId.get(nodeId)
+      for (const choice of node?.choices || []) {
+        if (choice.targetNodeId && !downstream.has(choice.targetNodeId)) queue.push(choice.targetNodeId)
+      }
+    }
+  }
+  const included = nodes.filter((node) => scope === 'downstream' ? downstream.has(node.id) : true)
+  const includedIds = new Set(included.map((node) => node.id))
+  const indegree = new Map(included.map((node) => [node.id, 0]))
+  for (const node of included) {
+    for (const choice of node.choices || []) {
+      if (includedIds.has(choice.targetNodeId)) {
+        indegree.set(choice.targetNodeId, (indegree.get(choice.targetNodeId) || 0) + 1)
+      }
+    }
+  }
+  const queue = included.filter((node) => (indegree.get(node.id) || 0) === 0)
+  const ordered = []
+  while (queue.length) {
+    const node = queue.shift()
+    ordered.push(node)
+    for (const choice of node.choices || []) {
+      if (!includedIds.has(choice.targetNodeId)) continue
+      indegree.set(choice.targetNodeId, (indegree.get(choice.targetNodeId) || 0) - 1)
+      if ((indegree.get(choice.targetNodeId) || 0) === 0) {
+        const target = byId.get(choice.targetNodeId)
+        if (target) queue.push(target)
+      }
+    }
+  }
+  const orderedIds = new Set(ordered.map((node) => node.id))
+  return [...ordered, ...included.filter((node) => !orderedIds.has(node.id))]
+}
+
+async function createCanvasWorkflowRun(actorUserId, project, input = {}) {
+  const createdAt = now()
+  const scope = input.scope === 'downstream' ? 'downstream' : 'all'
+  const orderedNodes = orderedCanvasNodes(project, input.startNodeId || '', scope)
+  const workflow = {
+    id: `flow_${randomUUID()}`,
+    projectId: project.id,
+    workspaceId: project.workspaceId,
+    status: 'running',
+    scope,
+    startNodeId: input.startNodeId || '',
+    nodeIds: orderedNodes.map((node) => node.id),
+    runIds: [],
+    credits: 0,
+    message: `正在运行 ${orderedNodes.length} 个节点`,
+    createdBy: actorUserId,
+    createdAt,
+    updatedAt: createdAt,
+    completedAt: null,
+  }
+  canvasWorkflowRuns.unshift(workflow)
+  for (const node of orderedNodes) {
+    const result = await createCanvasNodeRun(actorUserId, project, node.id, {
+      nodeType: node.nodeType,
+      prompt: node.prompt || node.summary || project.title,
+      model: node.model,
+    }, { persist: false })
+    if (result?.run) {
+      workflow.runIds.push(result.run.id)
+      workflow.credits += result.run.credits || 0
+    }
+  }
+  workflow.status = 'succeeded'
+  workflow.message = `工作流已完成：${workflow.runIds.length}/${orderedNodes.length} 个节点`
+  workflow.updatedAt = now()
+  workflow.completedAt = workflow.updatedAt
+  recordAudit(actorUserId, 'canvas.workflow_succeeded', 'project', project.id, {
+    workflowId: workflow.id,
+    nodeCount: orderedNodes.length,
+    credits: workflow.credits,
+  })
+  await saveDatabase()
+  return workflow
 }
 
 function normalizeVideoProvider(provider = '') {
@@ -7279,7 +7699,7 @@ async function callQwenChatCompletions(task, input) {
         flags: [],
       },
       policy: {
-        openaiAllowed: false,
+        openaiAllowed: true,
         market: 'China Mainland',
       },
     }
@@ -7443,6 +7863,92 @@ async function ensureFinalVideoRendersTable() {
   await pool.query(`
     create index if not exists idx_final_video_renders_status_updated
       on final_video_renders (status, updated_at desc)
+  `)
+}
+
+async function ensureCanvasRuntimeTables() {
+  if (STORAGE_DRIVER !== 'postgres') return
+
+  const pool = await getPgPool()
+  await pool.query(`
+    create table if not exists canvas_assets (
+      id text primary key,
+      workspace_id text not null references workspaces(id),
+      project_id text not null references projects(id),
+      node_id text,
+      type text not null default 'script',
+      name text not null default '',
+      meta text not null default '',
+      source text not null default '',
+      status text not null default 'ready',
+      file_name text not null default '',
+      mime_type text not null default '',
+      size bigint not null default 0,
+      url text not null default '',
+      created_by text references app_users(id),
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `)
+  await pool.query(`
+    create table if not exists canvas_node_runs (
+      id text primary key,
+      workspace_id text not null references workspaces(id),
+      project_id text not null references projects(id),
+      node_id text not null,
+      node_title text not null default '',
+      node_type text not null default 'text',
+      asset_id text references canvas_assets(id),
+      status text not null default 'succeeded',
+      progress integer not null default 100,
+      message text not null default '',
+      output_title text not null default '',
+      output_preview text not null default '',
+      model text not null default '',
+      prompt text not null default '',
+      credits integer not null default 0,
+      created_by text references app_users(id),
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    )
+  `)
+  await pool.query(`
+    create table if not exists canvas_workflow_runs (
+      id text primary key,
+      workspace_id text not null references workspaces(id),
+      project_id text not null references projects(id),
+      status text not null default 'running',
+      scope text not null default 'all',
+      start_node_id text not null default '',
+      node_ids jsonb not null default '[]'::jsonb,
+      run_ids jsonb not null default '[]'::jsonb,
+      credits integer not null default 0,
+      message text not null default '',
+      created_by text references app_users(id),
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now(),
+      completed_at timestamptz
+    )
+  `)
+  await pool.query(`
+    create index if not exists idx_canvas_assets_project_created
+      on canvas_assets (project_id, created_at desc)
+  `)
+  await pool.query(`
+    create index if not exists idx_canvas_assets_node_created
+      on canvas_assets (node_id, created_at desc)
+  `)
+  await pool.query(`
+    create index if not exists idx_canvas_node_runs_project_updated
+      on canvas_node_runs (project_id, updated_at desc)
+  `)
+  await pool.query(`
+    create index if not exists idx_canvas_node_runs_node_updated
+      on canvas_node_runs (node_id, updated_at desc)
+  `)
+  await pool.query(`
+    create index if not exists idx_canvas_workflow_runs_project_updated
+      on canvas_workflow_runs (project_id, updated_at desc)
   `)
 }
 
@@ -8374,6 +8880,103 @@ export async function handle(req, res) {
         }
       }
 
+      if (parts[3] === 'canvas' && parts[4] === 'assets') {
+        if (!project) {
+          notFound(res)
+          return
+        }
+
+        if (req.method === 'GET') {
+          if (!can(actorUserId, project.workspaceId, 'project:read')) {
+            forbidden(res)
+            return
+          }
+          sendJson(res, 200, { assets: listCanvasAssets(project.id) })
+          return
+        }
+
+        if (req.method === 'POST') {
+          if (!can(actorUserId, project.workspaceId, 'project:write')) {
+            forbidden(res)
+            return
+          }
+          const body = await readBody(req)
+          const asset = await createCanvasAsset(actorUserId, project, body)
+          sendJson(res, 201, { asset })
+          return
+        }
+      }
+
+      if (parts[3] === 'canvas' && parts[4] === 'node-runs') {
+        if (!project) {
+          notFound(res)
+          return
+        }
+
+        if (req.method === 'GET') {
+          if (!can(actorUserId, project.workspaceId, 'project:read')) {
+            forbidden(res)
+            return
+          }
+          sendJson(res, 200, { runs: listCanvasNodeRuns(project.id) })
+          return
+        }
+      }
+
+      if (
+        parts[3] === 'canvas' &&
+        parts[4] === 'nodes' &&
+        parts[5] &&
+        parts[6] === 'run' &&
+        req.method === 'POST'
+      ) {
+        if (!project) {
+          notFound(res)
+          return
+        }
+        if (!can(actorUserId, project.workspaceId, 'project:write')) {
+          forbidden(res)
+          return
+        }
+        const body = await readBody(req)
+        const result = await createCanvasNodeRun(actorUserId, project, parts[5], body)
+        if (!result) {
+          notFound(res)
+          return
+        }
+        sendJson(res, 202, result)
+        return
+      }
+
+      if (
+        parts[3] === 'canvas' &&
+        parts[4] === 'workflows' &&
+        parts[5] === 'run' &&
+        req.method === 'POST'
+      ) {
+        if (!project) {
+          notFound(res)
+          return
+        }
+        if (!can(actorUserId, project.workspaceId, 'project:write')) {
+          forbidden(res)
+          return
+        }
+        const body = await readBody(req)
+        const workflow = await createCanvasWorkflowRun(actorUserId, project, body)
+        sendJson(res, 202, {
+          workflow,
+          runs: workflow.runIds
+            .map((runId) => canvasNodeRuns.find((run) => run.id === runId))
+            .filter(Boolean),
+          assets: listCanvasAssets(project.id).filter((asset) => workflow.runIds.some((runId) => {
+            const run = canvasNodeRuns.find((item) => item.id === runId)
+            return run?.assetId === asset.id
+          })),
+        })
+        return
+      }
+
       if (parts[3] === 'video' && parts[4] === 'jobs') {
         if (!project) {
           notFound(res)
@@ -8749,4 +9352,3 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     startFinalVideoRenderWorker()
   })
 }
-

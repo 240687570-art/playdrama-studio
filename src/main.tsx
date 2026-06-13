@@ -1,22 +1,27 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
-import App from './App'
-import './index.css'
+﻿import { createRoot } from "react-dom/client"
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom"
+import LandingPage from "./pages/Landing"
+import StudioApp from "./components/StudioAppShell"
+import CanvasPage from "./pages/Canvas"
+import { ThemeProvider } from "./hooks/useTheme"
+import "./index.css"
+import "./libtv-stage2.css"
 
-// Lazy load page components for code splitting
-// import { lazy, Suspense } from 'react'
-// const StudioPage = lazy(() => import('./pages/Studio'))
-// const LandingPage = lazy(() => import('./pages/Landing'))
+if (!window.location.hash && /^\/studio(?:\/|$)/.test(window.location.pathname)) {
+  const studioPath = window.location.pathname.replace(/^\/studio\/?/, "").replace(/\/$/, "")
+  const studioHash = studioPath ? `#/studio/${studioPath}` : "#/studio"
+  window.history.replaceState({}, "", `/${window.location.search}${studioHash}`)
+}
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
+createRoot(document.getElementById("root")!).render(
+  <ThemeProvider>
     <HashRouter>
       <Routes>
-        <Route path="/" element={<App />} />
-        <Route path="/studio/*" element={<App />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/canvas" element={<CanvasPage />} />
+        <Route path="/studio/*" element={<StudioApp />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </HashRouter>
-  </StrictMode>,
+  </ThemeProvider>,
 )

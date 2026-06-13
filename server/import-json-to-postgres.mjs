@@ -57,6 +57,9 @@ function readJsonDatabase() {
     distributionJobs: Array.isArray(data.distributionJobs) ? data.distributionJobs : [],
     videoGenerationJobs: Array.isArray(data.videoGenerationJobs) ? data.videoGenerationJobs : [],
     finalVideoRenders: Array.isArray(data.finalVideoRenders) ? data.finalVideoRenders : [],
+    canvasAssets: Array.isArray(data.canvasAssets) ? data.canvasAssets : [],
+    canvasNodeRuns: Array.isArray(data.canvasNodeRuns) ? data.canvasNodeRuns : [],
+    canvasWorkflowRuns: Array.isArray(data.canvasWorkflowRuns) ? data.canvasWorkflowRuns : [],
     auditLog: Array.isArray(data.auditLog) ? data.auditLog : [],
     inviteEmailDeliveries: Array.isArray(data.inviteEmailDeliveries)
       ? data.inviteEmailDeliveries
@@ -76,6 +79,9 @@ async function importDatabase(snapshot) {
     await client.query('delete from auth_sessions')
     await client.query('delete from auth_sms_codes')
     await client.query('delete from auth_email_codes')
+    await client.query('delete from canvas_workflow_runs')
+    await client.query('delete from canvas_node_runs')
+    await client.query('delete from canvas_assets')
     await client.query('delete from final_video_renders')
     await client.query('delete from video_generation_jobs')
     await client.query('delete from distribution_jobs')
@@ -398,6 +404,84 @@ async function importDatabase(snapshot) {
       )
     }
 
+    for (const item of snapshot.canvasAssets) {
+      await client.query(
+        `insert into canvas_assets
+          (id, workspace_id, project_id, node_id, type, name, meta, source, status, file_name, mime_type, size, url, created_by, created_at, updated_at)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+        [
+          item.id,
+          item.workspaceId,
+          item.projectId,
+          item.nodeId || null,
+          item.type || 'script',
+          item.name || '',
+          item.meta || '',
+          item.source || '',
+          item.status || 'ready',
+          item.fileName || '',
+          item.mimeType || '',
+          Number(item.size || 0),
+          item.url || '',
+          item.createdBy || null,
+          item.createdAt || now(),
+          item.updatedAt || item.createdAt || now(),
+        ],
+      )
+    }
+
+    for (const item of snapshot.canvasNodeRuns) {
+      await client.query(
+        `insert into canvas_node_runs
+          (id, workspace_id, project_id, node_id, node_title, node_type, asset_id, status, progress, message, output_title, output_preview, model, prompt, credits, created_by, created_at, updated_at)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+        [
+          item.id,
+          item.workspaceId,
+          item.projectId,
+          item.nodeId,
+          item.nodeTitle || '',
+          item.nodeType || 'text',
+          item.assetId || null,
+          item.status || 'succeeded',
+          Number(item.progress || 100),
+          item.message || '',
+          item.outputTitle || '',
+          item.outputPreview || '',
+          item.model || '',
+          item.prompt || '',
+          Number(item.credits || 0),
+          item.createdBy || null,
+          item.createdAt || now(),
+          item.updatedAt || item.createdAt || now(),
+        ],
+      )
+    }
+
+    for (const item of snapshot.canvasWorkflowRuns) {
+      await client.query(
+        `insert into canvas_workflow_runs
+          (id, workspace_id, project_id, status, scope, start_node_id, node_ids, run_ids, credits, message, created_by, created_at, updated_at, completed_at)
+         values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11, $12, $13, $14)`,
+        [
+          item.id,
+          item.workspaceId,
+          item.projectId,
+          item.status || 'succeeded',
+          item.scope || 'all',
+          item.startNodeId || '',
+          JSON.stringify(item.nodeIds || []),
+          JSON.stringify(item.runIds || []),
+          Number(item.credits || 0),
+          item.message || '',
+          item.createdBy || null,
+          item.createdAt || now(),
+          item.updatedAt || item.createdAt || now(),
+          item.completedAt || null,
+        ],
+      )
+    }
+
     for (const item of snapshot.auditLog) {
       await client.query(
         `insert into audit_log
@@ -510,6 +594,9 @@ console.log(
       distributionJobs: snapshot.distributionJobs.length,
       videoGenerationJobs: snapshot.videoGenerationJobs.length,
       finalVideoRenders: snapshot.finalVideoRenders.length,
+      canvasAssets: snapshot.canvasAssets.length,
+      canvasNodeRuns: snapshot.canvasNodeRuns.length,
+      canvasWorkflowRuns: snapshot.canvasWorkflowRuns.length,
       auditLog: snapshot.auditLog.length,
       inviteEmailDeliveries: snapshot.inviteEmailDeliveries.length,
     },
