@@ -585,6 +585,17 @@ const videoProviderRecommendations = [
     fit: '海外高质量音画能力，受账号和地区可用性影响。',
     requiredEnv: ['VIDEO_PROVIDER=veo', 'VEO_API_KEY or GEMINI_API_KEY'],
   },
+  {
+    id: 'volcano-seedance',
+    displayName: '火山引擎 / Seedance 2.0',
+    market: 'china',
+    priority: 1,
+    configured: Boolean(process.env.VOLCANO_ARK_API_KEY || process.env.VOLCANO_ACCESS_KEY_ID),
+    defaultModel: process.env.VOLCANO_SEEDANCE_MODEL || 'doubao-seedance-2-0-fast-260128',
+    capabilities: ['text-to-video', 'image-to-video', 'audio', 'subject-reference'],
+    fit: '短剧视频生成首选，支持文生视频、图生视频和参考视频，画质高且带音频。',
+    requiredEnv: ['VIDEO_PROVIDER=volcano-seedance', 'VOLCANO_ARK_API_KEY or VOLCANO_ACCESS_KEY_ID'],
+  },
 ]
 
 const emailProviderRecommendations = [
@@ -6282,6 +6293,7 @@ async function refreshVideoProviderTask(job) {
       payload?.output?.video_url ||
       payload?.output?.results?.[0]?.video_url ||
       payload?.output?.results?.[0]?.url ||
+      payload?.content?.video_url ||
       payload?.video?.url ||
       payload?.creations?.[0]?.url ||
       payload?.file?.file?.download_url ||
@@ -8510,6 +8522,47 @@ export async function handle(req, res) {
       const body = await readBody(req)
       const auth = await verifySmsLoginCode(body)
       sendJson(res, 200, auth)
+      return
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/seedance/generate') {
+      const body = await readBody(req)
+      const prompt = body.prompt
+      const apiKey = process.env.VOLCANO_ARK_API_KEY || process.env.VOLCANO_ACCESS_KEY_ID || ''
+      if (!apiKey) {
+        sendJson(res, 503, { error: 'volcano_seedance_not_configured' })
+        return
+      }
+      if (!prompt) { sendJson(res, 400, { error: 'prompt required' }); return }
+      const ep = `${process.env.VOLCANO_SEEDANCE_ENDPOINT || 'https://ark.cn-beijing.volces.com/api/v3'}/contents/generations/tasks`
+      const model = body.model || process.env.VOLCANO_SEEDANCE_MODEL || 'doubao-seedance-2-0-fast-260128'
+      const timeoutMs = Number(body.timeoutMs || process.env.VOLCANO_SEEDANCE_TIMEOUT_MS || 120000)
+      try {
+        const resp = await fetch(ep, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model,
+            content: [
+              { type: 'text', text: prompt },
+              ...(body.referenceImageUrl
+                ? [{ type: 'image_url', image_url: { url: body.referenceImageUrl }, role: 'reference_image' }]
+                : []),
+            ],
+            duration: Number(body.duration || 5),
+            ratio: body.aspectRatio || body.ratio || '9:16',
+            resolution: body.resolution || '720p',
+            watermark: false,
+            generate_audio: body.generateAudio !== false,
+          }),
+          signal: AbortSignal.timeout(timeoutMs),
+        })
+        const data = await resp.json()
+        sendJson(res, resp.ok ? 201 : resp.status, data)
+      } catch (e) { sendJson(res, 500, { error: e instanceof Error ? e.message : 'seedance_request_failed' }) }
       return
     }
 

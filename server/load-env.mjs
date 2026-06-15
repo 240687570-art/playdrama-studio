@@ -41,6 +41,8 @@ export function loadEnvFile(filePath, { override = false } = {}) {
 export function loadLocalEnv({ cwd = process.cwd(), override = false } = {}) {
   loadEnvFile(join(cwd, '.env'), { override })
   loadEnvFile(join(cwd, '.env.local'), { override })
+  loadEnvFile(join(cwd, '.env.seedance.local'), { override })
+  loadEnvFile(join(cwd, '.env.tencent-sms.local'), { override })
 }
 
 loadLocalEnv()
