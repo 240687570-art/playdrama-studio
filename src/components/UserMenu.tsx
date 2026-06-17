@@ -43,7 +43,6 @@ export default function UserMenu({ userInfo, onLogout, unreadCount, onNotificati
 
   return (
     <div className="relative">
-      {/* Trigger */}
       <button
         onClick={toggle}
         className="flex items-center gap-2 rounded-full p-1 pr-3 transition-colors hover:bg-[#ffffff08] border border-transparent hover:border-[#ffffff0d]"
@@ -54,13 +53,10 @@ export default function UserMenu({ userInfo, onLogout, unreadCount, onNotificati
         </div>
         <ChevronDown className={"h-3 w-3 text-[#666] transition-transform " + (open ? 'rotate-180' : '')} />
       </button>
-
-      {/* Dropdown */}
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={close} />
           <div className="absolute right-0 top-full mt-2 z-50 w-[340px] rounded-2xl border border-[#ffffff10] bg-[#1a1a1a] shadow-2xl backdrop-blur-xl" onClick={e => e.stopPropagation()}>
-            {/* User Info */}
             <div className="p-4 space-y-3 border-b border-[#ffffff08]">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[#6366f1] to-[#a855f7] flex items-center justify-center text-[13px] font-bold text-white">
@@ -81,8 +77,6 @@ export default function UserMenu({ userInfo, onLogout, unreadCount, onNotificati
                   <Plus className="h-3 w-3" /> Create Team
                 </button>
               </div>
-
-              {/* Member Status */}
               <div className="flex items-center gap-2 rounded-xl bg-[#141414] px-3 py-2.5">
                 <span className="text-[12px] text-[#aaa]">Free User</span>
                 <button className="ml-auto flex items-center gap-1 rounded-lg bg-[#f7a600] px-3 py-1.5 text-[11px] font-medium text-black hover:bg-[#ffb833] transition-colors">
@@ -90,8 +84,6 @@ export default function UserMenu({ userInfo, onLogout, unreadCount, onNotificati
                   <span className="ml-1 rounded bg-black/20 px-1.5 py-0.5 text-[10px]">34% off</span>
                 </button>
               </div>
-
-              {/* Activity Banner */}
               <div className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#ff4757]/10 to-[#f7a600]/10 border border-[#ff4757]/15 px-3 py-2">
                 <Gift className="h-3.5 w-3.5 text-[#ff4757]" />
                 <span className="text-[11px] text-[#ff4757] font-medium">618 Red Envelope</span>
@@ -99,10 +91,7 @@ export default function UserMenu({ userInfo, onLogout, unreadCount, onNotificati
                 <button className="ml-auto text-[11px] text-[#666] hover:text-[#aaa]">View</button>
               </div>
             </div>
-
-            {/* Points & Storage */}
             <div className="p-4 space-y-3 border-b border-[#ffffff08]">
-              {/* Points */}
               <div>
                 <div className="flex items-center gap-2 mb-1.5">
                   <span className="text-[12px] font-medium text-[#aaa]">Points</span>
@@ -119,8 +108,6 @@ export default function UserMenu({ userInfo, onLogout, unreadCount, onNotificati
                   <span>PlayDrama {points.studio} pts</span>
                 </div>
               </div>
-
-              {/* Storage */}
               <div>
                 <div className="flex items-center gap-2 mb-1.5">
                   <span className="text-[12px] font-medium text-[#aaa]">Storage</span>
@@ -134,8 +121,6 @@ export default function UserMenu({ userInfo, onLogout, unreadCount, onNotificati
                 </div>
               </div>
             </div>
-
-            {/* Menu Items */}
             <div className="py-1.5 border-b border-[#ffffff08]">
               {[
                 { icon: User, label: 'Personal', subtitle: 'Profile, Verification, Preferences' },
@@ -150,7 +135,6 @@ export default function UserMenu({ userInfo, onLogout, unreadCount, onNotificati
                 </button>
               ))}
             </div>
-
             <div className="py-1.5 border-b border-[#ffffff08]">
               {[
                 { icon: Moon, label: 'Dark / Light Mode' },
@@ -169,8 +153,6 @@ export default function UserMenu({ userInfo, onLogout, unreadCount, onNotificati
                 </button>
               ))}
             </div>
-
-            {/* Logout */}
             <div className="py-1.5">
               <button
                 onClick={onLogout}
